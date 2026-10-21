@@ -1,0 +1,61 @@
+{
+  "id": "alertasSextoHo01",
+  "name": "Sexto Homem · Alertas",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Sao_Paulo"
+  },
+  "nodes": [
+    {
+      "id": "al1",
+      "name": "Quando uma execução falhar",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "al2",
+      "name": "Avisar por e-mail",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        0
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "smtpMailpit00001",
+          "name": "SMTP · Mailpit (local)"
+        }
+      },
+      "parameters": {
+        "fromEmail": "={{ $env.REMETENTE || 'Sexto Homem <newsletter@sextohomem.test>' }}",
+        "toEmail": "={{ $env.ALERTA_EMAIL || 'alertas@sextohomem.test' }}",
+        "subject": "=Falha no Sexto Homem: {{ $json.execution.lastNodeExecuted || $json.workflow.name }}",
+        "emailFormat": "text",
+        "text": "=O workflow \"{{ $json.workflow.name }}\" falhou no passo \"{{ $json.execution.lastNodeExecuted }}\".\n\nErro: {{ $json.execution.error.message }}\n\nExecução: {{ $json.execution.url }}",
+        "options": {
+          "appendAttribution": false
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Quando uma execução falhar": {
+      "main": [
+        [
+          {
+            "node": "Avisar por e-mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "sexto-homem",
+  "private": true,
+  "scripts": {
+    "test": "node --test \"testes/*.test.mjs\"",
+    "workflows": "node scripts/montar-workflows.mjs"
+  }
+}

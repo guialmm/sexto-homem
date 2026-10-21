@@ -1,0 +1,218 @@
+{
+  "id": "inscricaoSexto01",
+  "name": "Sexto Homem · Inscrição",
+  "active": true,
+  "settings": { "executionOrder": "v1", "timezone": "America/Sao_Paulo" },
+  "nodes": [
+    {
+      "id": "a1",
+      "name": "POST /inscrever",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [0, 0],
+      "webhookId": "5c1b1e0a-2f6c-4f43-9a51-6b8f1c0a0001",
+      "parameters": { "httpMethod": "POST", "path": "inscrever", "responseMode": "responseNode", "options": {} }
+    },
+    {
+      "id": "a2",
+      "name": "Validar dados",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0],
+      "parameters": {
+        "jsCode": "// Validates the form before anything touches the database.\nconst corpo = $input.first().json.body ?? {};\nconst nome = String(corpo.nome ?? '').trim().slice(0, 80);\nconst email = String(corpo.email ?? '').trim().toLowerCase().slice(0, 200);\nconst time = String(corpo.time ?? '').trim().toUpperCase().slice(0, 4) || null;\nconst consentimento = corpo.consentimento === true || corpo.consentimento === 'true';\n\nlet erro = null;\nif (!nome) erro = 'Diga seu nome.';\nelse if (!/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(email)) erro = 'Esse e-mail não parece válido.';\nelse if (!consentimento) erro = 'Precisamos do seu consentimento para enviar a newsletter (LGPD).';\n\nreturn [{ json: { ok: !erro, erro, nome, email, time } }];"
+      }
+    },
+    {
+      "id": "a3",
+      "name": "Dados válidos?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [440, 0],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a4",
+      "name": "Gravar inscrito",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [660, -100],
+      "credentials": { "postgres": { "id": "pgSextoHomem0001", "name": "Postgres · Sexto Homem" } },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Same e-mail again: refresh name/team; a pending or unsubscribed\n-- address gets a new confirmation token, an active one is left alone.\nINSERT INTO inscritos (nome, email, time_favorito)\nVALUES ($1, $2, NULLIF($3, ''))\nON CONFLICT (lower(email)) DO UPDATE SET\n  nome = EXCLUDED.nome,\n  time_favorito = EXCLUDED.time_favorito,\n  consentimento_em = now(),\n  status = CASE WHEN inscritos.status = 'descadastrado' THEN 'pendente' ELSE inscritos.status END,\n  token_confirmacao = CASE WHEN inscritos.status = 'ativo' THEN inscritos.token_confirmacao ELSE gen_random_uuid() END\nRETURNING nome, email, status, token_confirmacao;",
+        "options": { "queryReplacement": "={{ [$json.nome, $json.email, $json.time ?? ''] }}" }
+      }
+    },
+    {
+      "id": "a5",
+      "name": "Já confirmado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [880, -100],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "c2",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "ativo",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a6",
+      "name": "E-mail de confirmação",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1100, 0],
+      "credentials": { "smtp": { "id": "smtpMailpit00001", "name": "SMTP · Mailpit (local)" } },
+      "parameters": {
+        "fromEmail": "Sexto Homem <newsletter@sextohomem.test>",
+        "toEmail": "={{ $json.email }}",
+        "subject": "Confirme sua inscrição no Sexto Homem",
+        "emailFormat": "html",
+        "html": "=<div style=\"font-family:Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;color:#14110f\">\n  <p style=\"font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8a7f73;margin:0\">Sexto Homem</p>\n  <h1 style=\"font-size:24px;margin:8px 0 16px\">Falta um passo, {{ $json.nome }}.</h1>\n  <p style=\"font-size:16px;line-height:1.6\">Confirme seu e-mail para começar a receber, toda manhã, o que rolou na NBA enquanto você dormia.</p>\n  <p style=\"margin:28px 0\"><a href=\"{{ $env.SITE_URL }}/confirmar?token={{ $json.token_confirmacao }}\" style=\"background:#e8572a;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:600\">Confirmar inscrição</a></p>\n  <p style=\"font-size:13px;color:#8a7f73\">Se não foi você, ignore este e-mail: sem confirmação, você não recebe nada.</p>\n</div>",
+        "options": { "appendAttribution": false }
+      }
+    },
+    {
+      "id": "a7",
+      "name": "Responder ok",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [1320, -100],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, mensagem: 'Pronto! Confira seu e-mail para confirmar a inscrição.' } }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "a8",
+      "name": "Responder erro",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [660, 120],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: false, erro: $json.erro } }}",
+        "options": { "responseCode": 422 }
+      }
+    },
+
+    {
+      "id": "b1",
+      "name": "GET /confirmar",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [0, 400],
+      "webhookId": "5c1b1e0a-2f6c-4f43-9a51-6b8f1c0a0002",
+      "parameters": { "httpMethod": "GET", "path": "confirmar", "responseMode": "responseNode", "options": {} }
+    },
+    {
+      "id": "b2",
+      "name": "Confirmar inscrito",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [220, 400],
+      "alwaysOutputData": true,
+      "credentials": { "postgres": { "id": "pgSextoHomem0001", "name": "Postgres · Sexto Homem" } },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- A malformed token simply matches nothing instead of erroring.\nUPDATE inscritos SET status = 'ativo', confirmado_em = now()\nWHERE status = 'pendente'\n  AND token_confirmacao::text = $1\nRETURNING nome;",
+        "options": { "queryReplacement": "={{ [String($json.query.token ?? '')] }}" }
+      }
+    },
+    {
+      "id": "b3",
+      "name": "Responder confirmação",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [440, 400],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.nome ? { ok: true, nome: $json.nome } : { ok: false, erro: 'Link inválido ou já usado.' } }}",
+        "options": {}
+      }
+    },
+
+    {
+      "id": "c1n",
+      "name": "GET /descadastrar",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [0, 600],
+      "webhookId": "5c1b1e0a-2f6c-4f43-9a51-6b8f1c0a0003",
+      "parameters": { "httpMethod": "GET", "path": "descadastrar", "responseMode": "responseNode", "options": {} }
+    },
+    {
+      "id": "c2n",
+      "name": "Descadastrar inscrito",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [220, 600],
+      "alwaysOutputData": true,
+      "credentials": { "postgres": { "id": "pgSextoHomem0001", "name": "Postgres · Sexto Homem" } },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE inscritos SET status = 'descadastrado', descadastrado_em = now()\nWHERE status <> 'descadastrado'\n  AND token_descadastro::text = $1\nRETURNING nome;",
+        "options": { "queryReplacement": "={{ [String($json.query.token ?? '')] }}" }
+      }
+    },
+    {
+      "id": "c3n",
+      "name": "Responder descadastro",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [440, 600],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true } }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "POST /inscrever": { "main": [[{ "node": "Validar dados", "type": "main", "index": 0 }]] },
+    "Validar dados": { "main": [[{ "node": "Dados válidos?", "type": "main", "index": 0 }]] },
+    "Dados válidos?": {
+      "main": [
+        [{ "node": "Gravar inscrito", "type": "main", "index": 0 }],
+        [{ "node": "Responder erro", "type": "main", "index": 0 }]
+      ]
+    },
+    "Gravar inscrito": { "main": [[{ "node": "Já confirmado?", "type": "main", "index": 0 }]] },
+    "Já confirmado?": {
+      "main": [
+        [{ "node": "Responder ok", "type": "main", "index": 0 }],
+        [{ "node": "E-mail de confirmação", "type": "main", "index": 0 }]
+      ]
+    },
+    "E-mail de confirmação": { "main": [[{ "node": "Responder ok", "type": "main", "index": 0 }]] },
+    "GET /confirmar": { "main": [[{ "node": "Confirmar inscrito", "type": "main", "index": 0 }]] },
+    "Confirmar inscrito": { "main": [[{ "node": "Responder confirmação", "type": "main", "index": 0 }]] },
+    "GET /descadastrar": { "main": [[{ "node": "Descadastrar inscrito", "type": "main", "index": 0 }]] },
+    "Descadastrar inscrito": { "main": [[{ "node": "Responder descadastro", "type": "main", "index": 0 }]] }
+  }
+}

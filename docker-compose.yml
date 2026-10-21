@@ -41,7 +41,11 @@ services:
       WEBHOOK_URL: ${WEBHOOK_URL:-http://localhost:5678/}
       # Read by the workflows through $env
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODELO: ${GEMINI_MODELO:-gemini-3.6-flash}
       SITE_URL: ${SITE_URL:-http://localhost:3001}
+      REMETENTE: ${REMETENTE:-Sexto Homem <newsletter@sextohomem.test>}
+      ALERTA_EMAIL: ${ALERTA_EMAIL:-alertas@sextohomem.test}
+      SEXTO_DATA: ${SEXTO_DATA:-}             # YYYY-MM-DD replays a past morning
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
     ports: ["5678:5678"]
     volumes:

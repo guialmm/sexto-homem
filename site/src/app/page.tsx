@@ -11,7 +11,7 @@ export default function Inicio() {
   return (
     <div className="mx-auto grid max-w-6xl gap-12 px-5 pb-16 pt-8 sm:px-8 lg:grid-cols-[1.05fr_1fr] lg:gap-16 lg:pt-16">
       <section>
-        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-bola">Todo dia às 8h · em português · de graça</p>
+        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-bola-texto">Todo dia às 8h · em português · de graça</p>
         <h1 className="mt-4 font-placar text-6xl font-extrabold uppercase leading-[0.9] tracking-tight sm:text-7xl">
           A NBA da noite,
           <br />

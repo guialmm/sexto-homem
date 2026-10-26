@@ -9,7 +9,7 @@ workflow no **n8n**, sem ninguém encostar em nada.
 
 | A edição | O site de inscrição |
 |---|---|
-| ![Edição de 21/10/2026, a da noite de abertura da temporada](docs/edicao.png) | ![Site com o formulário e a prévia da última edição enviada](docs/site.png) |
+| ![Edição de 26/10/2026, a da noite dos 52 pontos de Luka Doncic](docs/edicao.png) | ![Site com o formulário e a prévia da última edição enviada](docs/site.png) |
 
 ## O workflow
 

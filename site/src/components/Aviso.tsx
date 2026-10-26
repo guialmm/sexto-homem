@@ -7,7 +7,7 @@ export function Aviso({ titulo, children, voltar = true }: { titulo: string; chi
       <h1 className="font-placar text-5xl font-extrabold uppercase leading-none">{titulo}</h1>
       <div className="mt-5 text-lg text-apagado">{children}</div>
       {voltar && (
-        <Link href="/" className="mt-8 inline-block text-sm font-semibold text-bola hover:underline">
+        <Link href="/" className="mt-8 inline-block text-sm font-semibold text-bola-texto hover:underline">
           Voltar para o início
         </Link>
       )}

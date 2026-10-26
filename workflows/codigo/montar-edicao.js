@@ -4,7 +4,8 @@
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const NOME_FONTE = { espn_br: "ESPN Brasil", lance: "Lance!", espn: "ESPN" };
-const COR = { tinta: "#14110f", apagado: "#7a7068", linha: "#ece6df", laranja: "#e8572a", fundo: "#faf7f3" };
+// Hardwood palette, same as the site: cream, dark brown, amber wood.
+const COR = { tinta: "#1e1610", apagado: "#7a6a5a", linha: "#e3d6c5", laranja: "#94591c", fundo: "#f4ece1", cartao: "#fbf7f1" };
 
 function lerIA(resposta) {
   try {
@@ -88,7 +89,7 @@ function montarEdicao({ dataEdicao, resultados, agenda, noticias, desfalques }, 
 
   const avisos = [resultados.falha, agenda.falha, desfalques.falha].filter(Boolean);
   const assunto = (ia?.assunto ?? `O que rolou na NBA: ${dataPorExtenso(dataEdicao)}`).slice(0, 90);
-  const html = `<div style="background:${COR.fundo};padding:24px 0"><div style="font-family:Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;padding:32px 28px;background:#fff;color:${COR.tinta}">
+  const html = `<div style="background:${COR.fundo};padding:24px 0"><div style="font-family:Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;padding:32px 28px;background:${COR.cartao};color:${COR.tinta}">
 <p style="margin:0;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:${COR.laranja};font-weight:700">Sexto Homem</p>
 <p style="margin:4px 0 0;font-size:13px;color:${COR.apagado}">${esc(dataPorExtenso(dataEdicao))}</p>
 <p style="margin:22px 0 0;font-size:17px;line-height:1.6">Bom dia, {{NOME}}. ${esc(ia?.abertura ?? "Aqui está o que rolou na NBA enquanto você dormia.")}</p>

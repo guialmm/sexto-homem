@@ -1,16 +1,18 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #fbfaf8;
-  --color-card: #ffffff;
-  --color-ink: #121110;
-  --color-bola: #ff5a1f; /* basketball orange */
-  --color-bola-suave: #fff1ea;
-  --color-linha: #e7e3dd;
-  --color-texto: #121110;
-  --color-apagado: #6e6862;
-  --color-ok: #1f7a4d;
-  --color-erro: #c2321f;
+  /* Hardwood: the colours of a basketball court floor. */
+  --color-bg: #f4ece1; /* cream */
+  --color-card: #fbf7f1;
+  --color-ink: #1e1610; /* dark brown */
+  --color-bola: #c8873a; /* amber wood: fills, lines, dots */
+  --color-bola-texto: #94591c; /* the same wood, dark enough for small text */
+  --color-bola-suave: #f1e2cc;
+  --color-linha: #e3d6c5;
+  --color-texto: #1e1610;
+  --color-apagado: #7a6a5a;
+  --color-ok: #3d6b3a;
+  --color-erro: #a8321f;
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-placar: var(--font-barlow), "Arial Narrow", sans-serif;

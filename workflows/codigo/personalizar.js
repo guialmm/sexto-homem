@@ -18,7 +18,7 @@ function personalizar(edicao, inscrito, siteUrl) {
     destaque = `Seu time joga hoje: ${meu.apelido} x ${outro.apelido}, às ${hoje.hora}.`;
   }
   const bloco = destaque
-    ? `<p style="margin:18px 0 0;padding:12px 16px;background:#fdf1ec;border-left:3px solid #e8572a;font-size:15px">${destaque.replace(/[<>&]/g, "")}</p>`
+    ? `<p style="margin:18px 0 0;padding:12px 16px;background:#f1e2cc;border-left:3px solid #c8873a;font-size:15px">${destaque.replace(/[<>&]/g, "")}</p>`
     : "";
   const primeiroNome = String(inscrito.nome).trim().split(/\s+/)[0].replace(/[<>&"]/g, "");
   return {

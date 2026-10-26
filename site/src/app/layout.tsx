@@ -17,7 +17,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col">
         <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-5 sm:px-8">
           <Link href="/" className="font-placar text-2xl font-extrabold uppercase tracking-wide">
-            Sexto <span className="text-bola">Homem</span>
+            Sexto <span className="text-bola-texto">Homem</span>
           </Link>
           <a
             href="https://github.com/guialmm/sexto-homem"

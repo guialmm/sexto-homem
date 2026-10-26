@@ -4,6 +4,8 @@ import { useState } from "react";
 
 import { TIMES } from "@/lib/times";
 
+import { Cesta } from "./Cesta";
+
 type Estado = { tipo: "parado" } | { tipo: "enviando" } | { tipo: "ok"; mensagem: string } | { tipo: "erro"; mensagem: string };
 
 export function Inscricao() {
@@ -34,9 +36,12 @@ export function Inscricao() {
 
   if (estado.tipo === "ok") {
     return (
-      <div className="animate-subir rounded-2xl border border-linha bg-card p-6">
-        <p className="font-placar text-2xl font-extrabold uppercase">Quase lá</p>
-        <p className="mt-2 text-apagado">{estado.mensagem} Se não aparecer em um minuto, olhe o spam.</p>
+      <div className="animate-subir flex items-center gap-5 rounded-2xl border border-linha bg-card p-5">
+        <Cesta />
+        <div>
+          <p className="font-placar text-3xl font-extrabold uppercase">Cesta!</p>
+          <p className="mt-1 text-apagado">{estado.mensagem} Se não aparecer em um minuto, olhe o spam.</p>
+        </div>
       </div>
     );
   }

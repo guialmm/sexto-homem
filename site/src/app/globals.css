@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #fbfaf8;
+  --color-card: #ffffff;
+  --color-ink: #121110;
+  --color-bola: #ff5a1f; /* basketball orange */
+  --color-bola-suave: #fff1ea;
+  --color-linha: #e7e3dd;
+  --color-texto: #121110;
+  --color-apagado: #6e6862;
+  --color-ok: #1f7a4d;
+  --color-erro: #c2321f;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-placar: var(--font-barlow), "Arial Narrow", sans-serif;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-texto);
+  font-family: var(--font-sans);
+}
+
+@keyframes subir {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+.animate-subir { animation: subir 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

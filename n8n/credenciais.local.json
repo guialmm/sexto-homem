@@ -1,0 +1,14 @@
+[
+  {
+    "id": "pgSextoHomem0001",
+    "name": "Postgres · Sexto Homem",
+    "type": "postgres",
+    "data": { "host": "db", "port": 5432, "database": "sexto_homem", "user": "sexto", "password": "sexto", "ssl": "disable", "allowUnauthorizedCerts": false, "sshTunnel": false }
+  },
+  {
+    "id": "smtpMailpit00001",
+    "name": "SMTP · Mailpit (local)",
+    "type": "smtp",
+    "data": { "host": "mailpit", "port": 1025, "secure": false, "disableStartTls": true, "user": "", "password": "" }
+  }
+]

@@ -39,7 +39,6 @@ body {
 /* Court markings trace themselves, one stroke after another. */
 @keyframes tracar { to { stroke-dashoffset: 0; } }
 .quadra :is(rect, circle, path) {
-  vector-effect: non-scaling-stroke;
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
   animation: tracar 1.4s cubic-bezier(0.6, 0, 0.2, 1) forwards;

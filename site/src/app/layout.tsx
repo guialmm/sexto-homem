@@ -3,6 +3,7 @@ import { Big_Shoulders, Manrope } from "next/font/google";
 import Link from "next/link";
 
 import { Placar } from "@/components/Placar";
+import { Quadra } from "@/components/Quadra";
 import "./globals.css";
 
 const manrope = Manrope({ variable: "--font-manrope", subsets: ["latin"] });
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${manrope.variable} ${bigShoulders.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
+        <Quadra />
         <Placar />
         <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-5 sm:px-8">
           <Link

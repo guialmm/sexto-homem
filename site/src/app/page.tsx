@@ -1,7 +1,6 @@
 import { Bola } from "@/components/Bola";
 import { Inscricao } from "@/components/Inscricao";
 import { Previa } from "@/components/Previa";
-import { Quadra } from "@/components/Quadra";
 import { Revelar } from "@/components/Revelar";
 
 const PONTOS = [
@@ -21,9 +20,7 @@ const PONTOS = [
 
 export default function Inicio() {
   return (
-    // The court spans the whole page width behind the content.
-    <div className="relative overflow-hidden">
-      <Quadra />
+    <div className="relative">
       <div className="relative mx-auto grid max-w-6xl gap-12 px-5 pb-16 pt-8 sm:px-8 lg:grid-cols-[1.05fr_1fr] lg:gap-16 lg:pt-16">
         <section className="relative min-w-0">
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-bola-texto">

@@ -47,7 +47,7 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           REMETENTE: ${{ secrets.REMETENTE }}
-          SITE_URL: ${{ vars.SITE_URL || 'https://sexto-homem.vercel.app' }}
+          SITE_URL: ${{ vars.SITE_URL || 'https://sexto-homem-seven.vercel.app' }}
         run: |
           # The key only has to live as long as this container.
           N8N_ENCRYPTION_KEY=$(openssl rand -hex 24)

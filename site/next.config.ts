@@ -1,8 +1,5 @@
 import type { NextConfig } from "next";
 
-// The site only talks to its own origin: /api/* is forwarded to n8n's webhooks.
-const N8N_URL = process.env.N8N_URL ?? "http://localhost:5678";
-
 const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
@@ -14,9 +11,6 @@ const nextConfig: NextConfig = {
         as: "*.css",
       },
     },
-  },
-  async rewrites() {
-    return [{ source: "/api/:path*", destination: `${N8N_URL}/webhook/:path*` }];
   },
   async headers() {
     return [

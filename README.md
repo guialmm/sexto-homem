@@ -3,7 +3,7 @@
 [![CI](https://github.com/guialmm/sexto-homem/actions/workflows/ci.yml/badge.svg)](https://github.com/guialmm/sexto-homem/actions/workflows/ci.yml)
 [![Edição diária](https://github.com/guialmm/sexto-homem/actions/workflows/edicao.yml/badge.svg)](https://github.com/guialmm/sexto-homem/actions/workflows/edicao.yml)
 
-**No ar: [sexto-homem-seven.vercel.app](https://sexto-homem-seven.vercel.app)** — inscreva-se e receba amanhã cedo.
+**No ar: [sextohomem.vercel.app](https://sextohomem.vercel.app)** — inscreva-se e receba amanhã cedo.
 
 **A NBA da noite, antes do café.** Newsletter diária em português: os jogos acabam de
 madrugada no Brasil, e às 8h chega o que você perdeu — resultados, as notícias que

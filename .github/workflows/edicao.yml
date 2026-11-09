@@ -1,0 +1,97 @@
+# The daily edition, with no server: every morning GitHub Actions starts a throwaway
+# n8n (SQLite inside the container), imports the workflow and runs it once. The
+# newsletter's data lives in Neon and the e-mails go out through Brevo.
+# A failed run is GitHub e-mailing the repository owner: that is the alert.
+name: edicao
+
+on:
+  schedule:
+    - cron: "37 10 * * *" # 07:37 in Brasília; off the full hour, when Actions queues pile up
+  workflow_dispatch:
+    inputs:
+      data:
+        description: "Refazer uma manhã passada (AAAA-MM-DD). Vazio = hoje."
+        required: false
+
+permissions:
+  contents: read
+  actions: write # re-enable this workflow at the end of every run (see the last step)
+
+concurrency:
+  group: edicao
+  cancel-in-progress: false
+
+jobs:
+  edicao:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SEXTO_DATA: ${{ inputs.data }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: credenciais do n8n (Neon e Brevo)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SMTP_LOGIN: ${{ secrets.SMTP_LOGIN }}
+          SMTP_CHAVE: ${{ secrets.SMTP_CHAVE }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/n8n"
+          node scripts/credenciais-ci.mjs > "$RUNNER_TEMP/n8n/credenciais.json"
+
+      - name: rodar a edição no n8n
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          REMETENTE: ${{ secrets.REMETENTE }}
+          SITE_URL: ${{ vars.SITE_URL || 'https://sexto-homem.vercel.app' }}
+        run: |
+          # The key only has to live as long as this container.
+          N8N_ENCRYPTION_KEY=$(openssl rand -hex 24)
+          # The secret is the bare address verified in Brevo; the inbox shows the name.
+          case "$REMETENTE" in *"<"*) ;; *) REMETENTE="Sexto Homem <$REMETENTE>" ;; esac
+          export REMETENTE
+          docker run --rm \
+            -v "$PWD/workflows:/workflows:ro" \
+            -v "$RUNNER_TEMP/n8n:/credenciais:ro" \
+            -e N8N_ENCRYPTION_KEY="$N8N_ENCRYPTION_KEY" \
+            -e GENERIC_TIMEZONE=America/Sao_Paulo -e TZ=America/Sao_Paulo \
+            -e N8N_DIAGNOSTICS_ENABLED=false -e N8N_PERSONALIZATION_ENABLED=false \
+            -e N8N_BLOCK_ENV_ACCESS_IN_NODE=false \
+            -e GEMINI_API_KEY -e REMETENTE -e SITE_URL -e SEXTO_DATA \
+            --entrypoint sh n8nio/n8n:2.44.5 -c '
+              set -e
+              n8n import:credentials --input=/credenciais/credenciais.json
+              n8n import:workflow --input=/workflows/edicao.json
+              n8n publish:workflow --id=edicaoSextoHom01
+              # The run data carries subscribers'"'"' addresses and this log is public:
+              # keep it in the container and show only the error, if any.
+              if ! n8n execute --id=edicaoSextoHom01 > /tmp/saida.txt 2>&1; then
+                grep -iE "error|erro|failed|NOT successful" /tmp/saida.txt | grep -v "@" | head -30
+                exit 1
+              fi
+              grep -iE "successful|NOT successful" /tmp/saida.txt | head -5 || true
+            '
+
+      - name: conferir que a edição saiu
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          DATA=${SEXTO_DATA:-$(TZ=America/Sao_Paulo date +%F)}
+          psql "$DATABASE_URL" -At -v data="$DATA" <<'SQL' | tee resultado.txt
+          SELECT coalesce((SELECT status FROM edicoes WHERE data = :'data'), 'sem edição')
+            || ' · ' || (SELECT count(*) FROM envios v JOIN edicoes e ON e.id = v.edicao_id WHERE e.data = :'data')
+            || ' envios · ' || (SELECT count(*) FROM inscritos WHERE status = 'ativo') || ' inscritos ativos';
+          SQL
+          grep -q '^enviada' resultado.txt || { echo "::error::a edição de $DATA não foi enviada"; exit 1; }
+
+      # GitHub disables scheduled workflows after 60 days without repository activity.
+      # Re-enabling it on every run resets that clock, so the newsletter never stops.
+      - name: manter o agendamento ativo
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/edicao.yml/enable"

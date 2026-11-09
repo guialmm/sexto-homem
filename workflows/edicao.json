@@ -4,8 +4,7 @@
   "active": true,
   "settings": {
     "executionOrder": "v1",
-    "timezone": "America/Sao_Paulo",
-    "errorWorkflow": "alertasSextoHo01"
+    "timezone": "America/Sao_Paulo"
   },
   "nodes": [
     {
@@ -510,8 +509,8 @@
       },
       "credentials": {
         "smtp": {
-          "id": "smtpMailpit00001",
-          "name": "SMTP · Mailpit (local)"
+          "id": "smtpSextoHomem01",
+          "name": "SMTP · Sexto Homem"
         }
       }
     },

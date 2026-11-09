@@ -1,4 +1,4 @@
-// Builds workflows/edicao.json and workflows/alertas.json.
+// Builds workflows/edicao.json.
 //
 // The JavaScript of each Code node lives in workflows/codigo/*.js, where it can
 // be read, reviewed and tested; this script stitches it into the JSON n8n imports.
@@ -8,7 +8,9 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 const codigo = (nome) => readFileSync(new URL(`../workflows/codigo/${nome}.js`, import.meta.url), "utf8");
 const PG = { postgres: { id: "pgSextoHomem0001", name: "Postgres · Sexto Homem" } };
-const SMTP = { smtp: { id: "smtpMailpit00001", name: "SMTP · Mailpit (local)" } };
+// Same ids everywhere: locally they point to docker-compose's Postgres and Mailpit,
+// in GitHub Actions to Neon and Brevo (see .github/workflows/edicao.yml).
+const SMTP = { smtp: { id: "smtpSextoHomem01", name: "SMTP · Sexto Homem" } };
 const NAVEGADOR = "Mozilla/5.0 (compatible; SextoHomem/1.0; +https://github.com/guialmm/sexto-homem)";
 // A source that is down must not sink the edition: its node passes the error on.
 const TOLERANTE = { onError: "continueRegularOutput", retryOnFail: true, maxTries: 3, waitBetweenTries: 5000 };
@@ -209,38 +211,10 @@ const edicao = {
   id: "edicaoSextoHom01",
   name: "Sexto Homem · Edição diária",
   active: true,
-  settings: { executionOrder: "v1", timezone: "America/Sao_Paulo", errorWorkflow: "alertasSextoHo01" },
+  settings: { executionOrder: "v1", timezone: "America/Sao_Paulo" },
   nodes,
   connections,
 };
 
-const alertas = {
-  id: "alertasSextoHo01",
-  name: "Sexto Homem · Alertas",
-  active: false,
-  settings: { executionOrder: "v1", timezone: "America/Sao_Paulo" },
-  nodes: [
-    { id: "al1", name: "Quando uma execução falhar", type: "n8n-nodes-base.errorTrigger", typeVersion: 1, position: [0, 0], parameters: {} },
-    {
-      id: "al2",
-      name: "Avisar por e-mail",
-      type: "n8n-nodes-base.emailSend",
-      typeVersion: 2.1,
-      position: [240, 0],
-      credentials: SMTP,
-      parameters: {
-        fromEmail: "={{ $env.REMETENTE || 'Sexto Homem <newsletter@sextohomem.test>' }}",
-        toEmail: "={{ $env.ALERTA_EMAIL || 'alertas@sextohomem.test' }}",
-        subject: "=Falha no Sexto Homem: {{ $json.execution.lastNodeExecuted || $json.workflow.name }}",
-        emailFormat: "text",
-        text: "=O workflow \"{{ $json.workflow.name }}\" falhou no passo \"{{ $json.execution.lastNodeExecuted }}\".\n\nErro: {{ $json.execution.error.message }}\n\nExecução: {{ $json.execution.url }}",
-        options: { appendAttribution: false },
-      },
-    },
-  ],
-  connections: { "Quando uma execução falhar": { main: [[{ node: "Avisar por e-mail", type: "main", index: 0 }]] } },
-};
-
 writeFileSync(new URL("../workflows/edicao.json", import.meta.url), JSON.stringify(edicao, null, 2) + "\n");
-writeFileSync(new URL("../workflows/alertas.json", import.meta.url), JSON.stringify(alertas, null, 2) + "\n");
-console.log(`edicao.json: ${nodes.length} nós, ${ligacoes.length} ligações · alertas.json`);
+console.log(`edicao.json: ${nodes.length} nós, ${ligacoes.length} ligações`);

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Loads the local credentials and the three workflows into the running n8n,
-# publishes them and restarts n8n so the schedule and webhooks go live.
+# Loads the local credentials and the daily edition into the running n8n,
+# publishes it and restarts n8n so the 8 a.m. schedule goes live.
 #
 #   docker compose up -d && scripts/importar.sh
 set -euo pipefail
@@ -12,14 +12,10 @@ echo "→ credenciais locais (Postgres e Mailpit do docker-compose)"
 docker compose cp n8n/credenciais.local.json n8n:/tmp/credenciais.json >/dev/null
 n8n import:credentials --input=/tmp/credenciais.json
 
-echo "→ workflows"
+echo "→ workflow da edição"
 npm run -s workflows
-for w in alertas inscricao edicao; do
-  n8n import:workflow --input="/workflows/$w.json"
-done
-for id in alertasSextoHo01 inscricaoSexto01 edicaoSextoHom01; do
-  n8n publish:workflow --id="$id"
-done
+n8n import:workflow --input=/workflows/edicao.json
+n8n publish:workflow --id=edicaoSextoHom01
 
 docker compose restart n8n >/dev/null
 echo "✓ pronto: n8n em http://localhost:5678, e-mails em http://localhost:8026"

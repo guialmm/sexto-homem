@@ -42,7 +42,7 @@ descadastrar e a prévia da última edição, gravando e lendo direto no Postgre
 
 ```mermaid
 flowchart LR
-  cron(["07h37 · cron"]) --> gha["GitHub Actions<br/>n8n descartável<br/>import → execute"]
+  cron(["~7h · Vercel Cron"]) -- workflow_dispatch --> gha["GitHub Actions<br/>n8n descartável<br/>import → execute"]
   leitor(["leitor"]) --> vercel["Vercel · Next.js<br/>/api/inscrever · /api/confirmar<br/>/api/descadastrar · /api/ultima-edicao"]
   gha -- SQL --> neon[("Neon · Postgres (São Paulo)<br/>inscritos · edicoes · noticias · envios")]
   vercel -- SQL --> neon
@@ -55,8 +55,12 @@ flowchart LR
   container, importa as credenciais (montadas a partir dos *secrets* por
   [`credenciais-ci.mjs`](scripts/credenciais-ci.mjs)) e o `edicao.json`, executa uma vez e
   descarta tudo. O estado que importa — quem é inscrito, o que já foi enviado — mora no Neon.
-- **Fora da hora cheia.** O cron é `37 10 * * *` (UTC): às 10h00 a fila do Actions lota e os
-  agendamentos atrasam.
+- **Na hora certa.** O agendamento do próprio GitHub atrasa sob carga: no segundo dia no ar, a
+  edição das 7h37 só saiu às 15h14. Agora quem dispara é o Vercel Cron (plano grátis: uma vez
+  por dia, dentro da hora marcada), chamando uma rota protegida do site
+  ([`disparar-edicao`](site/src/app/api/disparar-edicao/route.ts)) que pede o workflow por
+  `workflow_dispatch` — esse começa em segundos. O cron do GitHub ficou como reserva às 8h17;
+  se a edição do dia já saiu, ele não muda nada.
 - **O agendamento não morre.** O GitHub desliga *crons* depois de 60 dias sem atividade no
   repositório; todo run termina reativando o próprio workflow pela API, o que zera esse prazo.
 - **Log público, dados privados.** O repositório é público e o log do Actions também: a saída do
@@ -118,7 +122,7 @@ npm test   # 14 testes: leitura do PDF, montagem da edição, personalização, 
 |---|---|
 | Neon | `psql "$DATABASE_URL" -f db/init/02_schema.sql`, uma vez |
 | GitHub → *secrets* | `DATABASE_URL`, `SMTP_LOGIN`, `SMTP_CHAVE`, `REMETENTE`, `GEMINI_API_KEY`; variável `SITE_URL` |
-| Vercel | *Root Directory* `site`; variáveis `DATABASE_URL`, `SMTP_HOST=smtp-relay.brevo.com`, `SMTP_LOGIN`, `SMTP_CHAVE`, `REMETENTE`, `SITE_URL` |
+| Vercel | *Root Directory* `site`; variáveis `DATABASE_URL`, `SMTP_HOST=smtp-relay.brevo.com`, `SMTP_LOGIN`, `SMTP_CHAVE`, `REMETENTE`, `SITE_URL`, `CRON_SECRET` e `GH_DISPATCH_TOKEN` (token *fine-grained* só deste repositório, Actions: *read and write*) |
 
 Rodar a edição fora de hora: **Actions → edicao → Run workflow** (o campo `data` refaz uma
 manhã passada), ou `gh workflow run edicao.yml`.

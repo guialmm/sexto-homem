@@ -5,8 +5,11 @@
 name: edicao
 
 on:
+  # The run on time comes from Vercel Cron (site/vercel.json, 10:00-10:59 UTC = ~7h in
+  # Brasília) through workflow_dispatch: GitHub's schedule can be hours late under load.
+  # This one is the backup; if the edition already went out, it changes nothing.
   schedule:
-    - cron: "37 10 * * *" # 07:37 in Brasília; off the full hour, when Actions queues pile up
+    - cron: "17 11 * * *" # 08:17 in Brasília
   workflow_dispatch:
     inputs:
       data:

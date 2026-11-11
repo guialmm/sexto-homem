@@ -4,9 +4,8 @@ import { useState } from "react";
 
 import { TIMES } from "@/lib/times";
 
-import { Cesta } from "./Cesta";
 
-type Estado = { tipo: "parado" } | { tipo: "enviando" } | { tipo: "ok"; mensagem: string } | { tipo: "erro"; mensagem: string };
+type Estado = { tipo: "parado" } | { tipo: "enviando" } | { tipo: "ok"; email: string } | { tipo: "erro"; mensagem: string };
 
 export function Inscricao() {
   const [estado, setEstado] = useState<Estado>({ tipo: "parado" });
@@ -28,19 +27,27 @@ export function Inscricao() {
       });
       const corpo = await r.json().catch(() => null);
       if (!r.ok || !corpo?.ok) throw new Error(corpo?.erro ?? "Não deu certo agora. Tente de novo em instantes.");
-      setEstado({ tipo: "ok", mensagem: corpo.mensagem });
+      setEstado({ tipo: "ok", email: String(dados.get("email") ?? "") });
     } catch (e) {
       setEstado({ tipo: "erro", mensagem: e instanceof Error ? e.message : "Não deu certo agora." });
     }
   }
 
   if (estado.tipo === "ok") {
+    // No celebration yet: without the click in the e-mail, nothing arrives.
     return (
-      <div className="animate-subir flex items-center gap-5 rounded-2xl border border-linha bg-card p-5">
-        <Cesta />
+      <div role="status" className="animate-subir flex items-start gap-5 rounded-2xl border-2 border-bola bg-card p-5">
+        <svg viewBox="0 0 48 48" className="size-12 shrink-0" aria-hidden>
+          <rect x="4" y="10" width="40" height="28" rx="4" className="fill-none stroke-ink" strokeWidth="3" />
+          <path d="M6 13 L24 27 L42 13" className="fill-none stroke-bola" strokeWidth="3" strokeLinejoin="round" />
+        </svg>
         <div>
-          <p className="font-placar text-3xl font-extrabold uppercase">Cesta!</p>
-          <p className="mt-1 text-apagado">{estado.mensagem} Se não aparecer em um minuto, olhe o spam.</p>
+          <p className="font-placar text-3xl font-extrabold uppercase leading-none">Falta confirmar</p>
+          <p className="mt-2">
+            Mandamos um e-mail para <strong className="break-all">{estado.email}</strong>. Abra e clique em{" "}
+            <strong>Confirmar inscrição</strong>: <strong>sem esse clique, você não recebe a newsletter.</strong>
+          </p>
+          <p className="mt-2 text-sm text-apagado">Não chegou em um minuto? Olhe o spam e a aba Promoções.</p>
         </div>
       </div>
     );
@@ -71,6 +78,9 @@ export function Inscricao() {
       >
         {estado.tipo === "enviando" ? "Inscrevendo…" : "Quero receber de graça"}
       </button>
+      <p className="text-sm text-apagado">
+        Depois de enviar, confirme pelo link que chega no seu e-mail: só assim a inscrição vale.
+      </p>
       {estado.tipo === "erro" && (
         <p role="alert" className="text-sm text-erro">
           {estado.mensagem}

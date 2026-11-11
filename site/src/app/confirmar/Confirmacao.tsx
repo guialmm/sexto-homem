@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { Aviso } from "@/components/Aviso";
+import { Cesta } from "@/components/Cesta";
 
 type Resultado = { ok: boolean; nome?: string; erro?: string };
 
@@ -24,8 +25,9 @@ export function Confirmacao() {
   if (!resultado) return <Aviso titulo="Confirmando…" voltar={false} />;
   if (!resultado.ok) return <Aviso titulo="Link inválido">Esse link já foi usado ou expirou. Se ainda não recebe a newsletter, inscreva-se de novo.</Aviso>;
   return (
-    <Aviso titulo={`Tudo certo, ${resultado.nome?.split(" ")[0]}`}>
-      Sua inscrição está confirmada. A próxima edição chega amanhã às 8h.
+    // The swish only now: the subscription counts from this click on.
+    <Aviso topo={<Cesta />} titulo={`Cesta, ${resultado.nome?.split(" ")[0]}!`}>
+      Inscrição confirmada. A próxima edição chega amanhã cedo, por volta das 7h.
     </Aviso>
   );
 }

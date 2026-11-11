@@ -1,7 +1,7 @@
 import { consulta } from "@/lib/db";
 import { emailConfirmacao, enviarEmail } from "@/lib/email";
 
-const MENSAGEM = "Pronto! Confira seu e-mail para confirmar a inscrição.";
+const MENSAGEM = "Falta confirmar: abra o e-mail que enviamos e clique em Confirmar inscrição.";
 
 type Inscrito = { nome: string; email: string; status: string; token_confirmacao: string };
 

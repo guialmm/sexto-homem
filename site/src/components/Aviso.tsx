@@ -1,9 +1,20 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-export function Aviso({ titulo, children, voltar = true }: { titulo: string; children?: ReactNode; voltar?: boolean }) {
+export function Aviso({
+  titulo,
+  children,
+  voltar = true,
+  topo,
+}: {
+  titulo: string;
+  children?: ReactNode;
+  voltar?: boolean;
+  topo?: ReactNode;
+}) {
   return (
     <div className="animate-subir mx-auto max-w-xl px-5 py-20 text-center sm:px-8">
+      {topo && <div className="mb-6 flex justify-center">{topo}</div>}
       <h1 className="font-placar text-5xl font-extrabold uppercase leading-none">{titulo}</h1>
       <div className="mt-5 text-lg text-apagado">{children}</div>
       {voltar && (

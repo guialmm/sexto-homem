@@ -10,6 +10,12 @@ export async function GET(request: Request) {
   if (!segredo || request.headers.get("authorization") !== `Bearer ${segredo}`) {
     return Response.json({ ok: false }, { status: 401 });
   }
+  // ?data=YYYY-MM-DD replays a past morning; an edition already sent changes nothing,
+  // which makes it a safe end-to-end test of the secret, the token and the workflow.
+  const data = new URL(request.url).searchParams.get("data");
+  if (data !== null && !/^\d{4}-\d{2}-\d{2}$/.test(data)) {
+    return Response.json({ ok: false, erro: "data deve ser AAAA-MM-DD" }, { status: 422 });
+  }
   const token = process.env.GH_DISPATCH_TOKEN;
   if (!token) return Response.json({ ok: false, erro: "GH_DISPATCH_TOKEN ausente" }, { status: 500 });
 
@@ -21,7 +27,7 @@ export async function GET(request: Request) {
       "X-GitHub-Api-Version": "2022-11-28",
       "User-Agent": "sexto-homem-cron",
     },
-    body: JSON.stringify({ ref: "main" }),
+    body: JSON.stringify({ ref: "main", ...(data ? { inputs: { data } } : {}) }),
     signal: AbortSignal.timeout(15000),
   });
   if (r.status !== 204) {

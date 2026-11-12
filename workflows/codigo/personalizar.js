@@ -1,8 +1,10 @@
-// One e-mail per subscriber: first name, their unsubscribe link, and a line
-// about their team when it played last night or plays tonight.
+// One e-mail per subscriber: first name, their unsubscribe link, and their team at the
+// top: last night's result and tonight's game with the pick.
 function personalizar(edicao, inscrito, siteUrl) {
   const time = inscrito.time_favorito;
-  let destaque = "";
+  // Both, when the team played last night and plays again tonight: the subscriber's own
+  // team comes first, before anything else in the edition.
+  const linhas = [];
   const jogo = edicao.resultados.jogos.find((j) => j.casa.sigla === time || j.visitante.sigla === time);
   const hoje = edicao.agenda.jogos.find((j) => j.casa.sigla === time || j.visitante.sigla === time);
   if (jogo) {
@@ -11,14 +13,18 @@ function personalizar(edicao, inscrito, siteUrl) {
     // Team names are English plurals ("Celtics", "Pistons"): no Portuguese article fits
     // every one of them, so the sentence is built without articles.
     const quem = meu.cestinha ? ` ${meu.cestinha.nome} fez ${meu.cestinha.valor}.` : "";
-    destaque = `Seu time ${meu.venceu ? "venceu" : "perdeu"}: ${meu.apelido} ${meu.pontos} x ${outro.pontos} ${outro.apelido}.${quem}`;
-  } else if (hoje) {
+    linhas.push(`Seu time ${meu.venceu ? "venceu" : "perdeu"}: ${meu.apelido} ${meu.pontos} x ${outro.pontos} ${outro.apelido}.${quem}`);
+  }
+  if (hoje) {
     const outro = hoje.casa.sigla === time ? hoje.visitante : hoje.casa;
     const meu = hoje.casa.sigla === time ? hoje.casa : hoje.visitante;
-    destaque = `Seu time joga hoje: ${meu.apelido} x ${outro.apelido}, às ${hoje.hora}.`;
+    const p = hoje.palpite;
+    const palpite = p ? ` Palpite: ${p.favorito === meu.sigla ? meu.apelido : outro.apelido} (${p.chance}%).` : "";
+    linhas.push(`${jogo ? "E joga de novo hoje" : "Seu time joga hoje"}: ${meu.apelido} x ${outro.apelido}, às ${hoje.hora}.${palpite}`);
   }
+  const destaque = linhas.join("<br>");
   const bloco = destaque
-    ? `<p style="margin:18px 0 0;padding:12px 16px;background:#f1e2cc;border-left:3px solid #c8873a;font-size:15px">${destaque.replace(/[<>&]/g, "")}</p>`
+    ? `<p style="margin:18px 0 0;padding:12px 16px;background:#f1e2cc;border-left:3px solid #c8873a;font-size:15px">${linhas.map((l) => l.replace(/[<>&]/g, "")).join("<br>")}</p>`
     : "";
   const primeiroNome = String(inscrito.nome).trim().split(/\s+/)[0].replace(/[<>&"]/g, "");
   return {

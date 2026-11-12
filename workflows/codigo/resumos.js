@@ -4,7 +4,9 @@
 // The model reads both to write a fuller comment; a game whose summary fails keeps
 // its score and leaders, just with less to say.
 const MAX_RECAP = 1800;
-const MAX_LANCES = 6;
+const MAX_LANCES = 8;
+const NAO_E_LANCE =
+  /game highlights|full highlights|postgame|press conference|interview|reacts|discusses|talks|locker room|heads to|walks off|exits|checks out|leaves the game|helped off|ruled out|status|update/i;
 
 function semHtml(texto) {
   return String(texto ?? "")
@@ -23,8 +25,9 @@ function lerResumo(resumo) {
   const vistos = new Set();
   const lances = (resumo.videos ?? [])
     .map((v) => ({ titulo: semHtml(v.headline), url: v.links?.web?.href ?? null }))
-    // The full-game package says nothing about a specific play.
-    .filter((v) => v.titulo && !/game highlights|full highlights|postgame|press conference/i.test(v.titulo))
+    // Not a play: the full-game package, interviews, and clips of a player walking to the
+    // locker room (the injury itself is rarely in them, there is nothing to watch).
+    .filter((v) => v.titulo && !NAO_E_LANCE.test(v.titulo))
     .filter((v) => !vistos.has(v.titulo) && vistos.add(v.titulo))
     .slice(0, MAX_LANCES)
     // Only https links to ESPN's own video pages go into the e-mail.

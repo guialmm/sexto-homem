@@ -45,13 +45,13 @@ test("resumo: matéria sem HTML e lances com link só da ESPN, sem o pacote do j
     article: { story: "<p>Curry <a href='x'>left</a> with soreness &amp; didn&#39;t return.</p>" },
     videos: [
       { headline: "Warriors vs. Rockets: Game Highlights", links: { web: { href: "https://www.espn.com/video/clip/_/id/1" } } },
-      { headline: "Steph Curry heads to locker room", links: { web: { href: "https://www.espn.com/video/clip/_/id/2" } } },
+      { headline: "Steph Curry drains a logo three", links: { web: { href: "https://www.espn.com/video/clip/_/id/2" } } },
       { headline: "Amen Thompson alley-oop", links: { web: { href: "javascript:alert(1)" } } },
     ],
   });
   assert.equal(r.recap, "Curry left with soreness & didn't return.");
   assert.deepEqual(r.lances.map((l) => [l.n, l.titulo, l.url]), [
-    [1, "Steph Curry heads to locker room", "https://www.espn.com/video/clip/_/id/2"],
+    [1, "Steph Curry drains a logo three", "https://www.espn.com/video/clip/_/id/2"],
     [2, "Amen Thompson alley-oop", null],
   ]);
   assert.deepEqual(lerResumo(null), { recap: null, lances: [] });
@@ -132,4 +132,32 @@ test("no máximo 3 vídeos, na ordem de importância da IA e não na ordem dos j
   assert.equal(html.split("&#9654;").length - 1, 3);
   assert.ok(["5", "2", "4"].every((id) => html.includes(`video ${id}`)));
   assert.ok(!html.includes("video 1") && !html.includes("video 3"));
+});
+
+test("clipe de jogador indo para o vestiário não é lance: some antes da IA", () => {
+  const r = lerResumo({
+    videos: [
+      { headline: "Steph Curry heads to locker room with abdominal injury", links: { web: { href: "https://www.espn.com/video/clip/_/id/1" } } },
+      { headline: "Jalen Williams goes down after awkward landing", links: { web: { href: "https://www.espn.com/video/clip/_/id/2" } } },
+      { headline: "Wemby posterizes Giannis", links: { web: { href: "https://www.espn.com/video/clip/_/id/3" } } },
+    ],
+  });
+  assert.deepEqual(r.lances.map((l) => l.titulo), ["Jalen Williams goes down after awkward landing", "Wemby posterizes Giannis"]);
+});
+
+const { personalizar } = carregar("personalizar");
+
+test("time do coração no topo: resultado de ontem e jogo de hoje com palpite", () => {
+  const time = (sigla, apelido, pontos, venceu) => ({ sigla, apelido, pontos, venceu, cestinha: { nome: "Stephen Curry", valor: 31 } });
+  const ed = {
+    assunto: "a",
+    html: "Bom dia, {{NOME}}.{{DESTAQUE_TIME}} <a href='{{DESCADASTRAR}}'>sair</a>",
+    resultados: { jogos: [{ id: "1", visitante: time("GS", "Warriors", 108, false), casa: time("HOU", "Rockets", 115, true) }] },
+    agenda: { jogos: [{ id: "2", hora: "23:30", visitante: { sigla: "GS", apelido: "Warriors" }, casa: { sigla: "SAC", apelido: "Kings" }, palpite: { favorito: "GS", chance: 64 } }] },
+  };
+  const { html } = personalizar(ed, { email: "g@x.com", nome: "Guilherme Almeida", time_favorito: "GS", token_descadastro: "t" }, "https://s");
+  assert.ok(html.includes("Seu time perdeu: Warriors 108 x 115 Rockets. Stephen Curry fez 31."));
+  assert.ok(html.includes("<br>E joga de novo hoje: Warriors x Kings, às 23:30. Palpite: Warriors (64%)."));
+  const soHoje = personalizar({ ...ed, resultados: { jogos: [] } }, { email: "g@x.com", nome: "G", time_favorito: "GS", token_descadastro: "t" }, "https://s");
+  assert.ok(soHoje.html.includes("Seu time joga hoje: Warriors x Kings, às 23:30."));
 });

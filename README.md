@@ -23,14 +23,23 @@ Todo dia por volta das 8h (horário de Brasília):
 
 1. **Coleta** em paralelo:
    - placares de ontem e jogos de hoje — JSON da ESPN;
+   - o resumo de cada jogo de ontem (a matéria e os clipes de lances) e, para cada jogo de
+     hoje, a chance de vitória do *Matchup Predictor* da ESPN, campanhas em casa e fora,
+     últimos 5 jogos e quem joga em noites seguidas;
    - notícias — RSS da ESPN Brasil e da ESPN, e o *sitemap* de notícias do Lance (XML);
    - desfalques — o **relatório oficial de lesões da NBA, em PDF**.
 2. **Descarta notícia repetida**: a URL é única no banco, então nada que saiu ontem volta hoje.
-3. **A IA (Gemini) escreve a edição**: assunto, abertura, um comentário por jogo, as 6
-   notícias mais relevantes traduzidas e resumidas, os motivos das lesões em português e
-   os dois desfalques que mais pesam em cada jogo.
+3. **A IA (Gemini) escreve a edição**: assunto, abertura, um comentário por jogo (o que
+   decidiu, quem se machucou na partida), as 6 notícias mais relevantes traduzidas e
+   resumidas, os motivos das lesões em português, os dois desfalques que mais pesam em cada
+   jogo, o **motivo de cada palpite** e os **até 3 lances da noite** que valem o vídeo.
+   - O favorito e a chance do palpite vêm da ESPN (ou da linha de apostas, ou da campanha):
+     a IA só explica o porquê, não decide quem ganha.
+   - Vídeos escolhidos como um editor de highlights: jogada de impacto primeiro; lesão só se
+     for grave e o lance aparecer no clipe. "Jogador vai para o vestiário" nem chega à IA.
 4. **Monta o e-mail** e **personaliza por leitor**: primeiro nome, link de descadastro e,
-   se ele escolheu um time, uma linha no topo — "Seu time perdeu: Celtics 113 x 121 Pistons".
+   se ele escolheu um time, o time dele no topo — "Seu time perdeu: Warriors 108 x 115
+   Rockets" e, se joga de novo, o jogo de hoje com o palpite.
 5. **Envia em lotes de 10** e registra cada envio.
 6. Se qualquer passo falhar, o job do GitHub Actions falha e o GitHub avisa por e-mail;
    um último passo ainda confere no banco que a edição do dia ficou como `enviada`.
@@ -97,6 +106,7 @@ O guia deste projeto diz: *nem toda fonte entrega os dados prontos*. Foi exatame
 |---|---|
 | Ninguém recebe a mesma edição duas vezes | tabela `envios` (edição, inscrito); uma nova execução depois de uma queda continua de onde parou |
 | Nenhuma notícia se repete entre edições | `url` única em `noticias`; notícia coletada mas ainda não enviada continua disponível |
+| A IA não decide o palpite | favorito e chance vêm da ESPN; a IA escreve só o motivo |
 | A IA não inventa link nem jogador | ela só referencia jogos e notícias pelo `id` recebido; links vêm do banco; ids e nomes fora da lista são descartados |
 | Descadastro de verdade, e só de propósito | o link do e-mail abre uma página com botão; a rota só aceita `POST` — Gmail e Outlook abrem os links dos e-mails para checá-los, e isso não pode descadastrar ninguém |
 | Inscrição não revela quem já é inscrito | a resposta é a mesma para e-mail novo e já cadastrado |

@@ -15,9 +15,11 @@ Regras:
   (ex.: saiu no primeiro quarto com dor abdominal e não voltou) e o lance mais marcante
   (uma enterrada por cima de alguém, uma cesta no estouro do relógio). Nada além do que
   está no resumo e nos lances.
-- Para cada jogo de ontem, escolha no máximo um lance ("n") que valha o vídeo: uma
-  jogada espetacular ou a lesão de um jogador importante. Escreva uma legenda curta em
-  português (até 60 caracteres). Se nenhum lance se destaca, não escolha.
+- Vídeos: escolha no máximo 3 lances na edição inteira (campo "lance" com o "n"), e só
+  os que valem o clique: uma jogada realmente espetacular (enterrada por cima de alguém,
+  cesta da vitória no fim) ou a lesão de uma estrela. Enterrada comum, bola de três comum
+  ou arremesso errado não contam. Na dúvida, não escolha. Legenda curta em português
+  (até 60 caracteres).
 - Para cada jogo de hoje há um palpite pronto (favorito e chance, de uma fonte). Não mude
   o favorito nem a chance: escreva só o motivo, uma frase, usando o contexto (campanha,
   campanha em casa ou fora, últimos 5 jogos, segunda noite seguida, desfalques).

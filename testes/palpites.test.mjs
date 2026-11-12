@@ -106,3 +106,19 @@ test("lance inventado ou sem link não vira link; sem jogos hoje, o e-mail avisa
   const outro = edicao([], { jogos: [{ id: "1", comentario: "x", lance: 42 }] });
   assert.ok(!outro.html.includes("&#9654;"));
 });
+
+test("no máximo 3 vídeos na edição inteira, mesmo que a IA escolha mais", () => {
+  const lances = [{ n: 1, titulo: "t", url: "https://www.espn.com/video/clip/_/id/9" }];
+  const jogos = Array.from({ length: 5 }, (_, i) => ({
+    id: String(i + 1),
+    visitante: { sigla: "A", apelido: "A", pontos: 1, venceu: false },
+    casa: { sigla: "B", apelido: "B", pontos: 2, venceu: true },
+    prorrogacoes: 0,
+    lances,
+  }));
+  const { html } = montarEdicao(
+    { dataEdicao: "2026-11-12", resultados: { jogos }, agenda: { jogos: [] }, noticias: { noticias: [] }, desfalques: { porTime: {} } },
+    { jogos: jogos.map((j) => ({ id: j.id, comentario: "c", lance: 1 })), palpites: [], noticias: [], motivos: [], desfalques_importantes: [] },
+  );
+  assert.equal(html.split("&#9654;").length - 1, 3);
+});

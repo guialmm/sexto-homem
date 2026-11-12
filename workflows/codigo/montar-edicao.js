@@ -3,6 +3,7 @@
 // model failed altogether the edition still goes out, just without commentary.
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const MAX_VIDEOS = 3;
 const NOME_FONTE = { espn_br: "ESPN Brasil", lance: "Lance!", espn: "ESPN" };
 // Hardwood palette, same as the site: cream, dark brown, amber wood.
 const COR = { tinta: "#1e1610", apagado: "#7a6a5a", linha: "#e3d6c5", laranja: "#94591c", fundo: "#f4ece1", cartao: "#fbf7f1" };
@@ -28,6 +29,13 @@ function montarEdicao({ dataEdicao, resultados, agenda, noticias, desfalques }, 
   const idsJogos = new Set(resultados.jogos.map((j) => j.id));
   const porId = new Map(noticias.noticias.map((n) => [n.id, n]));
   const daIA = new Map((ia?.jogos ?? []).filter((j) => idsJogos.has(j.id)).map((j) => [j.id, j]));
+  // At most three clips in the whole edition, a link under every game is clutter.
+  const comVideo = new Set(
+    resultados.jogos
+      .filter((j) => (j.lances ?? []).some((l) => l.n === daIA.get(j.id)?.lance && l.url))
+      .slice(0, MAX_VIDEOS)
+      .map((j) => j.id),
+  );
   const motivos = new Map((ia?.palpites ?? []).map((p) => [p.id, p.motivo]));
   const escolhidas = (ia?.noticias ?? []).filter((n) => porId.has(n.id)).slice(0, 6);
   // Without the model: the newest stories in Portuguese, titles as published.
@@ -50,7 +58,7 @@ function montarEdicao({ dataEdicao, resultados, agenda, noticias, desfalques }, 
         .join(" · ");
       const comentario = daIA.get(j.id)?.comentario;
       // The link always comes from ESPN's list: a clip number the model made up shows nothing.
-      const escolhido = (j.lances ?? []).find((l) => l.n === daIA.get(j.id)?.lance && l.url);
+      const escolhido = comVideo.has(j.id) && (j.lances ?? []).find((l) => l.n === daIA.get(j.id)?.lance && l.url);
       const lance = escolhido
         ? `<p style="margin:6px 0 0;font-size:13px"><a href="${esc(escolhido.url)}" style="color:${COR.laranja};text-decoration:none">&#9654;&nbsp;${esc(daIA.get(j.id)?.legenda_lance || "Ver o lance")}</a></p>`
         : "";

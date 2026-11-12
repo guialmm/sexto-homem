@@ -54,8 +54,11 @@ const nodes = [
 
   http("Placares de ontem", "=https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates={{ $json.ontem }}", [480, 0]),
   code("Resultados", "resultados", [700, 0]),
+  // Recap and highlight clips per game, and a pick per game tonight (ESPN summaries).
+  code("Resumos dos jogos", "resumos", [920, 0], { onError: "continueRegularOutput" }),
   http("Jogos de hoje", "=https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates={{ $json.hoje }}", [480, 180]),
   code("Agenda", "agenda", [700, 180]),
+  code("Palpites", "palpites", [920, 180], { onError: "continueRegularOutput" }),
 
   // Portuguese feeds such as The Playoffs and Jumper Brasil were dropped: their RSS
   // stopped updating months ago, though the sites are alive.
@@ -180,8 +183,10 @@ const ligacoes = [
   liga("Achar último relatório", "Baixar PDF"),
   liga("Baixar PDF", "Ler PDF"),
   liga("Ler PDF", "Desfalques"),
-  liga("Resultados", "Juntar tudo", 0),
-  liga("Agenda", "Juntar tudo", 1),
+  liga("Resultados", "Resumos dos jogos"),
+  liga("Resumos dos jogos", "Juntar tudo", 0),
+  liga("Agenda", "Palpites"),
+  liga("Palpites", "Juntar tudo", 1),
   liga("Lista de notícias", "Juntar tudo", 2),
   liga("Desfalques", "Juntar tudo", 3),
   liga("Juntar tudo", "Preparar pedido à IA"),

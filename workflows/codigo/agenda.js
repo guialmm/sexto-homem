@@ -5,7 +5,15 @@ function lerAgenda(resposta) {
   }
   const hora = (iso) =>
     new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
-  const lado = (t) => ({ sigla: t.team.abbreviation, nome: t.team.displayName, apelido: t.team.shortDisplayName, campanha: t.records?.[0]?.summary ?? null });
+  const campanha = (t, tipo) => t.records?.find((r) => r.type === tipo)?.summary ?? null;
+  const lado = (t) => ({
+    sigla: t.team.abbreviation,
+    nome: t.team.displayName,
+    apelido: t.team.shortDisplayName,
+    campanha: campanha(t, "total") ?? t.records?.[0]?.summary ?? null,
+    em_casa: campanha(t, "home"),
+    fora_de_casa: campanha(t, "road"),
+  });
   const jogos = resposta.events
     .filter((e) => e.status?.type?.state === "pre")
     .sort((a, b) => a.date.localeCompare(b.date))
@@ -13,6 +21,7 @@ function lerAgenda(resposta) {
       const c = e.competitions[0];
       return {
         id: String(e.id),
+        data: e.date,
         hora: hora(e.date),
         casa: lado(c.competitors.find((t) => t.homeAway === "home")),
         visitante: lado(c.competitors.find((t) => t.homeAway === "away")),

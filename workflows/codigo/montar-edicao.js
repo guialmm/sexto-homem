@@ -27,7 +27,8 @@ function secao(titulo, corpo) {
 function montarEdicao({ dataEdicao, resultados, agenda, noticias, desfalques }, ia) {
   const idsJogos = new Set(resultados.jogos.map((j) => j.id));
   const porId = new Map(noticias.noticias.map((n) => [n.id, n]));
-  const comentarios = new Map((ia?.jogos ?? []).filter((j) => idsJogos.has(j.id)).map((j) => [j.id, j.comentario]));
+  const daIA = new Map((ia?.jogos ?? []).filter((j) => idsJogos.has(j.id)).map((j) => [j.id, j]));
+  const motivos = new Map((ia?.palpites ?? []).map((p) => [p.id, p.motivo]));
   const escolhidas = (ia?.noticias ?? []).filter((n) => porId.has(n.id)).slice(0, 6);
   // Without the model: the newest stories in Portuguese, titles as published.
   const lista = escolhidas.length
@@ -47,11 +48,17 @@ function montarEdicao({ dataEdicao, resultados, agenda, noticias, desfalques }, 
         .filter((t) => t.cestinha)
         .map((t) => `${esc(t.cestinha.nome)} ${t.cestinha.valor} pts`)
         .join(" · ");
-      const comentario = comentarios.get(j.id);
+      const comentario = daIA.get(j.id)?.comentario;
+      // The link always comes from ESPN's list: a clip number the model made up shows nothing.
+      const escolhido = (j.lances ?? []).find((l) => l.n === daIA.get(j.id)?.lance && l.url);
+      const lance = escolhido
+        ? `<p style="margin:6px 0 0;font-size:13px"><a href="${esc(escolhido.url)}" style="color:${COR.laranja};text-decoration:none">&#9654;&nbsp;${esc(daIA.get(j.id)?.legenda_lance || "Ver o lance")}</a></p>`
+        : "";
       return `<div style="margin:0 0 18px">
   <p style="margin:0;font-size:18px">${time(j.visitante)} <span style="color:${COR.apagado}">x</span> ${time(j.casa)}${ot}</p>
   <p style="margin:4px 0 0;font-size:13px;color:${COR.apagado}">Cestinhas: ${cestinhas}</p>
   ${comentario ? `<p style="margin:6px 0 0;font-size:15px;line-height:1.55">${esc(comentario)}</p>` : ""}
+  ${lance}
 </div>`;
     })
     .join("");
@@ -80,8 +87,15 @@ function montarEdicao({ dataEdicao, resultados, agenda, noticias, desfalques }, 
       const linha = [escolhidas.map((b) => b.texto).join("; "), resto ? `${escolhidas.length ? "e mais " : ""}${resto} fora` : ""]
         .filter(Boolean)
         .join("; ");
-      return `<div style="margin:0 0 14px">
+      const p = j.palpite;
+      const favorito = p && (p.favorito === j.casa.sigla ? j.casa : p.favorito === j.visitante.sigla ? j.visitante : null);
+      const motivo = motivos.get(j.id);
+      const palpite = favorito
+        ? `<p style="margin:5px 0 0;font-size:14px;line-height:1.5"><span style="color:${COR.apagado}">Palpite:</span> <strong>${esc(favorito.apelido)}</strong> <span style="color:${COR.apagado}">(${p.chance}%)</span>${motivo ? ` &mdash; ${esc(motivo)}` : ""}</p>`
+        : "";
+      return `<div style="margin:0 0 16px">
   <p style="margin:0;font-size:16px"><span style="font-family:monospace;color:${COR.laranja}">${esc(j.hora)}</span>&nbsp; ${esc(j.visitante.apelido)} x ${esc(j.casa.apelido)}</p>
+  ${palpite}
   ${linha ? `<p style="margin:3px 0 0;font-size:13px;color:${COR.apagado}">Desfalques: ${linha}</p>` : ""}
 </div>`;
     })
@@ -96,9 +110,9 @@ function montarEdicao({ dataEdicao, resultados, agenda, noticias, desfalques }, 
 {{DESTAQUE_TIME}}
 ${resultados.jogos.length ? secao("Resultados da noite", jogosHtml) : ""}
 ${lista.length ? secao("O que rolou", noticiasHtml) : ""}
-${agenda.jogos.length ? secao("Hoje à noite", agendaHtml) : ""}
+${agenda.jogos.length ? secao("Hoje à noite: jogos e palpites", agendaHtml) : agenda.falha ? "" : secao("Hoje à noite", `<p style="margin:0;font-size:15px;color:${COR.apagado}">Sem jogos da NBA hoje à noite.</p>`)}
 ${avisos.length ? `<p style="margin:24px 0 0;font-size:12px;color:${COR.apagado}">Hoje faltou: ${esc(avisos.join(", "))}.</p>` : ""}
-<p style="margin:36px 0 0;font-size:12px;line-height:1.6;color:${COR.apagado};border-top:1px solid ${COR.linha};padding-top:16px">Você recebe o Sexto Homem porque se inscreveu e confirmou seu e-mail. Placares e estatísticas: ESPN. Desfalques: relatório oficial da NBA. <a href="{{DESCADASTRAR}}" style="color:${COR.apagado}">Descadastrar em um clique</a>.</p>
+<p style="margin:36px 0 0;font-size:12px;line-height:1.6;color:${COR.apagado};border-top:1px solid ${COR.linha};padding-top:16px">Você recebe o Sexto Homem porque se inscreveu e confirmou seu e-mail. Placares, estatísticas, lances e chances dos palpites: ESPN. Desfalques: relatório oficial da NBA. Palpite é palpite: não é dica de aposta. <a href="{{DESCADASTRAR}}" style="color:${COR.apagado}">Descadastrar em um clique</a>.</p>
 </div></div>`;
 
   return { dataEdicao, assunto, html, jogos: resultados.jogos.length, noticiasIds: lista.map((n) => n.id).filter(Number.isInteger), comIA: Boolean(ia), resultados, agenda };

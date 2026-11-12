@@ -10,7 +10,17 @@ Regras:
 - Refira-se a jogos e notícias apenas pelos "id" recebidos.
 - Escolha no máximo 6 notícias, as mais relevantes, sem repetir assunto; ignore as que
   não forem sobre a NBA. Reescreva o título em português e resuma em uma ou duas frases.
-- Para cada jogo de ontem, uma frase de comentário com o que decidiu o jogo.
+- Para cada jogo de ontem, um comentário de duas ou três frases: o que decidiu o jogo e,
+  quando o resumo em inglês ou os lances mostrarem, quem se machucou durante a partida
+  (ex.: saiu no primeiro quarto com dor abdominal e não voltou) e o lance mais marcante
+  (uma enterrada por cima de alguém, uma cesta no estouro do relógio). Nada além do que
+  está no resumo e nos lances.
+- Para cada jogo de ontem, escolha no máximo um lance ("n") que valha o vídeo: uma
+  jogada espetacular ou a lesão de um jogador importante. Escreva uma legenda curta em
+  português (até 60 caracteres). Se nenhum lance se destaca, não escolha.
+- Para cada jogo de hoje há um palpite pronto (favorito e chance, de uma fonte). Não mude
+  o favorito nem a chance: escreva só o motivo, uma frase, usando o contexto (campanha,
+  campanha em casa ou fora, últimos 5 jogos, segunda noite seguida, desfalques).
 - Traduza TODOS os motivos de lesão da lista para um português curto e natural.
 - Para cada jogo de hoje, escolha até 2 desfalques que mais pesam (titulares e estrelas),
   usando exatamente os nomes da lista; se nenhum pesa, não escolha nenhum.`;
@@ -20,7 +30,23 @@ const ESQUEMA = {
   properties: {
     assunto: { type: "string", description: "Assunto do e-mail, até 70 caracteres, sobre o fato mais marcante" },
     abertura: { type: "string", description: "Duas ou três frases abrindo a edição" },
-    jogos: { type: "array", items: { type: "object", properties: { id: { type: "string" }, comentario: { type: "string" } }, required: ["id", "comentario"] } },
+    jogos: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          comentario: { type: "string" },
+          lance: { type: "integer", description: "n do lance escolhido; omita se nenhum" },
+          legenda_lance: { type: "string" },
+        },
+        required: ["id", "comentario"],
+      },
+    },
+    palpites: {
+      type: "array",
+      items: { type: "object", properties: { id: { type: "string" }, motivo: { type: "string" } }, required: ["id", "motivo"] },
+    },
     noticias: {
       type: "array",
       items: { type: "object", properties: { id: { type: "integer" }, titulo: { type: "string" }, resumo: { type: "string" } }, required: ["id", "titulo", "resumo"] },
@@ -28,7 +54,7 @@ const ESQUEMA = {
     motivos: { type: "array", items: { type: "object", properties: { original: { type: "string" }, traducao: { type: "string" } }, required: ["original", "traducao"] } },
     desfalques_importantes: { type: "array", items: { type: "string" }, description: "Nomes, exatamente como na lista" },
   },
-  required: ["assunto", "abertura", "jogos", "noticias", "motivos", "desfalques_importantes"],
+  required: ["assunto", "abertura", "jogos", "palpites", "noticias", "motivos", "desfalques_importantes"],
 };
 
 function montarPedido({ resultados, agenda, noticias, desfalques }) {
@@ -43,11 +69,15 @@ function montarPedido({ resultados, agenda, noticias, desfalques }) {
       placar: placar(j),
       prorrogacoes: j.prorrogacoes,
       manchete_em_ingles: j.manchete,
+      resumo_em_ingles: j.recap ?? null,
+      lances: (j.lances ?? []).map((l) => ({ n: l.n, titulo: l.titulo })),
       destaques: [j.visitante, j.casa].map((t) => ({ time: t.apelido, cestinha: t.cestinha, rebotes: t.rebotes, assistencias: t.assistencias })),
     })),
     noticias: noticias.noticias.map((n) => ({ id: n.id, fonte: n.fonte, titulo: n.titulo, resumo: n.resumo })),
     jogos_de_hoje: agenda.jogos.map((j) => ({
+      id: j.id,
       jogo: `${j.hora} ${j.visitante.apelido} x ${j.casa.apelido}`,
+      palpite: j.palpite ? { favorito: j.palpite.favorito, chance: `${j.palpite.chance}%`, contexto: j.palpite.contexto } : null,
       desfalques: [j.visitante.sigla, j.casa.sigla].flatMap((sigla) =>
         (desfalques.porTime?.[sigla] ?? []).filter((d) => d.status === "fora" || d.status === "dúvida").map((d) => d.jogador),
       ),

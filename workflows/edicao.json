@@ -95,6 +95,20 @@
     },
     {
       "id": "no006",
+      "name": "Resumos dos jogos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        920,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// What happened in each of last night's games beyond the box score: ESPN's recap\n// (where an injury during the game shows up, \"left in the third quarter with a sore\n// ankle\") and the highlight clips (a poster dunk, a buzzer-beater) with their links.\n// The model reads both to write a fuller comment; a game whose summary fails keeps\n// its score and leaders, just with less to say.\nconst MAX_RECAP = 1800;\nconst MAX_LANCES = 6;\n\nfunction semHtml(texto) {\n  return String(texto ?? \"\")\n    .replace(/<[^>]+>/g, \" \")\n    .replace(/&nbsp;/g, \" \")\n    .replace(/&amp;/g, \"&\")\n    .replace(/&quot;/g, '\"')\n    .replace(/&#39;|&apos;/g, \"'\")\n    .replace(/\\s+/g, \" \")\n    .trim();\n}\n\nfunction lerResumo(resumo) {\n  if (!resumo || resumo.error) return { recap: null, lances: [] };\n  const recap = semHtml(resumo.article?.story).slice(0, MAX_RECAP) || null;\n  const vistos = new Set();\n  const lances = (resumo.videos ?? [])\n    .map((v) => ({ titulo: semHtml(v.headline), url: v.links?.web?.href ?? null }))\n    // The full-game package says nothing about a specific play.\n    .filter((v) => v.titulo && !/game highlights|full highlights|postgame|press conference/i.test(v.titulo))\n    .filter((v) => !vistos.has(v.titulo) && vistos.add(v.titulo))\n    .slice(0, MAX_LANCES)\n    // Only https links to ESPN's own video pages go into the e-mail.\n    .map((v, i) => ({ n: i + 1, titulo: v.titulo, url: /^https:\\/\\/www\\.espn\\.com\\//.test(v.url ?? \"\") ? v.url : null }));\n  return { recap, lances };\n}\n\nif (typeof $input !== \"undefined\") {\n  const resultados = $input.first().json;\n  const jogos = [];\n  for (const jogo of resultados.jogos ?? []) {\n    let resumo = null;\n    try {\n      resumo = await this.helpers.httpRequest({\n        url: `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${jogo.id}`,\n        headers: { \"User-Agent\": \"Mozilla/5.0 (compatible; SextoHomem/1.0; +https://github.com/guialmm/sexto-homem)\" },\n        json: true,\n        timeout: 20000,\n      });\n    } catch {\n      // keep going: one summary down must not sink the edition\n    }\n    jogos.push({ ...jogo, ...lerResumo(resumo) });\n  }\n  return [{ json: { ...resultados, jogos } }];\n} else {\n  module.exports = { lerResumo, semHtml };\n}\n"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "no007",
       "name": "Jogos de hoje",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -123,7 +137,7 @@
       "waitBetweenTries": 5000
     },
     {
-      "id": "no007",
+      "id": "no008",
       "name": "Agenda",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -132,11 +146,25 @@
         180
       ],
       "parameters": {
-        "jsCode": "// Tonight's games, with the tip-off in Brasília time.\nfunction lerAgenda(resposta) {\n  if (!resposta || resposta.error || !Array.isArray(resposta.events)) {\n    return { tipo: \"agenda\", jogos: [], falha: \"agenda indisponível\" };\n  }\n  const hora = (iso) =>\n    new Intl.DateTimeFormat(\"pt-BR\", { timeZone: \"America/Sao_Paulo\", hour: \"2-digit\", minute: \"2-digit\" }).format(new Date(iso));\n  const lado = (t) => ({ sigla: t.team.abbreviation, nome: t.team.displayName, apelido: t.team.shortDisplayName, campanha: t.records?.[0]?.summary ?? null });\n  const jogos = resposta.events\n    .filter((e) => e.status?.type?.state === \"pre\")\n    .sort((a, b) => a.date.localeCompare(b.date))\n    .map((e) => {\n      const c = e.competitions[0];\n      return {\n        id: String(e.id),\n        hora: hora(e.date),\n        casa: lado(c.competitors.find((t) => t.homeAway === \"home\")),\n        visitante: lado(c.competitors.find((t) => t.homeAway === \"away\")),\n      };\n    });\n  return { tipo: \"agenda\", jogos, falha: null };\n}\n\nif (typeof $input !== \"undefined\") {\n  return [{ json: lerAgenda($input.first().json) }];\n} else {\n  module.exports = { lerAgenda };\n}\n"
+        "jsCode": "// Tonight's games, with the tip-off in Brasília time.\nfunction lerAgenda(resposta) {\n  if (!resposta || resposta.error || !Array.isArray(resposta.events)) {\n    return { tipo: \"agenda\", jogos: [], falha: \"agenda indisponível\" };\n  }\n  const hora = (iso) =>\n    new Intl.DateTimeFormat(\"pt-BR\", { timeZone: \"America/Sao_Paulo\", hour: \"2-digit\", minute: \"2-digit\" }).format(new Date(iso));\n  const campanha = (t, tipo) => t.records?.find((r) => r.type === tipo)?.summary ?? null;\n  const lado = (t) => ({\n    sigla: t.team.abbreviation,\n    nome: t.team.displayName,\n    apelido: t.team.shortDisplayName,\n    campanha: campanha(t, \"total\") ?? t.records?.[0]?.summary ?? null,\n    em_casa: campanha(t, \"home\"),\n    fora_de_casa: campanha(t, \"road\"),\n  });\n  const jogos = resposta.events\n    .filter((e) => e.status?.type?.state === \"pre\")\n    .sort((a, b) => a.date.localeCompare(b.date))\n    .map((e) => {\n      const c = e.competitions[0];\n      return {\n        id: String(e.id),\n        data: e.date,\n        hora: hora(e.date),\n        casa: lado(c.competitors.find((t) => t.homeAway === \"home\")),\n        visitante: lado(c.competitors.find((t) => t.homeAway === \"away\")),\n      };\n    });\n  return { tipo: \"agenda\", jogos, falha: null };\n}\n\nif (typeof $input !== \"undefined\") {\n  return [{ json: lerAgenda($input.first().json) }];\n} else {\n  module.exports = { lerAgenda };\n}\n"
       }
     },
     {
-      "id": "no008",
+      "id": "no009",
+      "name": "Palpites",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        920,
+        180
+      ],
+      "parameters": {
+        "jsCode": "// A pick for each of tonight's games. The chance comes from a source, never from the\n// model: ESPN's Matchup Predictor first, then the betting line, and only when neither\n// exists a plain estimate from the records. The model only writes the \"why\", from the\n// context gathered here (records home and away, last five, second night in a row).\nconst ET = \"America/New_York\";\n\nconst diaET = (iso) => new Intl.DateTimeFormat(\"en-CA\", { timeZone: ET, year: \"numeric\", month: \"2-digit\", day: \"2-digit\" }).format(new Date(iso));\nconst ontemET = (iso) => diaET(new Date(new Date(iso).getTime() - 24 * 3600 * 1000).toISOString());\nconst aproveitamento = (campanha) => {\n  const [v, d] = String(campanha ?? \"\").split(\"-\").map(Number);\n  return v + d > 0 ? v / (v + d) : 0.5;\n};\n// Moneyline → implied probability (still carries the bookmaker's margin; normalized below).\nconst implicita = (ml) => (ml < 0 ? -ml / (-ml + 100) : 100 / (ml + 100));\n\nfunction chanceCasa(resumo, jogo) {\n  const p = Number(resumo?.predictor?.homeTeam?.gameProjection);\n  if (p > 0 && p < 100) return { chance: Math.round(p), fonte: \"ESPN\" };\n  const linha = (resumo?.pickcenter ?? []).find((x) => x.homeTeamOdds?.moneyLine && x.awayTeamOdds?.moneyLine);\n  if (linha) {\n    const c = implicita(linha.homeTeamOdds.moneyLine);\n    const v = implicita(linha.awayTeamOdds.moneyLine);\n    return { chance: Math.round((100 * c) / (c + v)), fonte: \"apostas\" };\n  }\n  // Records alone: the better team wins more, and home court is worth a few points.\n  const casa = aproveitamento(jogo.casa.campanha);\n  const fora = aproveitamento(jogo.visitante.campanha);\n  const chance = Math.round(100 * Math.min(0.85, Math.max(0.15, 0.5 + (casa - fora) / 2 + 0.06)));\n  return { chance, fonte: \"campanha\" };\n}\n\nfunction lerPalpite(resumo, jogo) {\n  const { chance, fonte } = chanceCasa(resumo, jogo);\n  const favoritoCasa = chance >= 50;\n  const ultimos = Object.fromEntries(\n    (resumo?.lastFiveGames ?? []).map((t) => [\n      t.team?.abbreviation,\n      (t.events ?? []).slice().sort((a, b) => String(a.gameDate).localeCompare(String(b.gameDate))),\n    ]),\n  );\n  const contexto = (lado) => {\n    const jogos = ultimos[lado.sigla] ?? [];\n    const ultimo = jogos.at(-1);\n    return {\n      sigla: lado.sigla,\n      campanha: lado.campanha,\n      em_casa: lado.em_casa ?? null,\n      fora_de_casa: lado.fora_de_casa ?? null,\n      ultimos_5: jogos.map((g) => g.gameResult).join(\"\") || null,\n      // Played last night (US calendar): tired legs, often a rotation player rested.\n      segunda_noite_seguida: Boolean(ultimo && jogo.data && diaET(ultimo.gameDate) === ontemET(jogo.data)),\n    };\n  };\n  return {\n    favorito: favoritoCasa ? jogo.casa.sigla : jogo.visitante.sigla,\n    chance: favoritoCasa ? chance : 100 - chance,\n    fonte,\n    contexto: { casa: contexto(jogo.casa), visitante: contexto(jogo.visitante) },\n  };\n}\n\nif (typeof $input !== \"undefined\") {\n  const agenda = $input.first().json;\n  const jogos = [];\n  for (const jogo of agenda.jogos ?? []) {\n    let resumo = null;\n    try {\n      resumo = await this.helpers.httpRequest({\n        url: `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${jogo.id}`,\n        headers: { \"User-Agent\": \"Mozilla/5.0 (compatible; SextoHomem/1.0; +https://github.com/guialmm/sexto-homem)\" },\n        json: true,\n        timeout: 20000,\n      });\n    } catch {\n      // without the summary the pick falls back to the records\n    }\n    jogos.push({ ...jogo, palpite: lerPalpite(resumo, jogo) });\n  }\n  return [{ json: { ...agenda, jogos } }];\n} else {\n  module.exports = { lerPalpite };\n}\n"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "no010",
       "name": "ESPN Brasil",
       "type": "n8n-nodes-base.rssFeedRead",
       "typeVersion": 1.1,
@@ -154,7 +182,7 @@
       "waitBetweenTries": 5000
     },
     {
-      "id": "no009",
+      "id": "no011",
       "name": "ESPN (inglês)",
       "type": "n8n-nodes-base.rssFeedRead",
       "typeVersion": 1.1,
@@ -172,7 +200,7 @@
       "waitBetweenTries": 5000
     },
     {
-      "id": "no010",
+      "id": "no012",
       "name": "Mapa de notícias do Lance",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -207,7 +235,7 @@
       "waitBetweenTries": 5000
     },
     {
-      "id": "no011",
+      "id": "no013",
       "name": "Lance em JSON",
       "type": "n8n-nodes-base.xml",
       "typeVersion": 1,
@@ -223,7 +251,7 @@
       "onError": "continueRegularOutput"
     },
     {
-      "id": "no012",
+      "id": "no014",
       "name": "Juntar fontes",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
@@ -236,7 +264,7 @@
       }
     },
     {
-      "id": "no013",
+      "id": "no015",
       "name": "Notícias das últimas 24h",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -249,7 +277,7 @@
       }
     },
     {
-      "id": "no014",
+      "id": "no016",
       "name": "Guardar notícias novas",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
@@ -272,7 +300,7 @@
       }
     },
     {
-      "id": "no015",
+      "id": "no017",
       "name": "Lista de notícias",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -285,7 +313,7 @@
       }
     },
     {
-      "id": "no016",
+      "id": "no018",
       "name": "Achar último relatório",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -299,7 +327,7 @@
       "onError": "continueRegularOutput"
     },
     {
-      "id": "no017",
+      "id": "no019",
       "name": "Baixar PDF",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -334,7 +362,7 @@
       "waitBetweenTries": 5000
     },
     {
-      "id": "no018",
+      "id": "no020",
       "name": "Ler PDF",
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1,
@@ -350,7 +378,7 @@
       "onError": "continueRegularOutput"
     },
     {
-      "id": "no019",
+      "id": "no021",
       "name": "Desfalques",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -363,7 +391,7 @@
       }
     },
     {
-      "id": "no020",
+      "id": "no022",
       "name": "Juntar tudo",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
@@ -376,7 +404,7 @@
       }
     },
     {
-      "id": "no021",
+      "id": "no023",
       "name": "Preparar pedido à IA",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -385,11 +413,11 @@
         400
       ],
       "parameters": {
-        "jsCode": "// Builds the request for the model. It writes the prose; it never decides facts:\n// scores, links and injuries come from the sources, and the model refers to\n// games and stories only by the ids it was given.\nconst SISTEMA = `Você escreve o Sexto Homem, newsletter diária da NBA em português do Brasil,\nlida às 8h por quem dormiu antes dos jogos acabarem.\nTom: fã que entende de basquete, direto, com bom humor leve. Nada de clichê de IA,\nnada de emoji, nada de exclamação em toda frase.\nRegras:\n- Use somente os dados fornecidos. Não invente placares, números, lesões nem fatos.\n- Refira-se a jogos e notícias apenas pelos \"id\" recebidos.\n- Escolha no máximo 6 notícias, as mais relevantes, sem repetir assunto; ignore as que\n  não forem sobre a NBA. Reescreva o título em português e resuma em uma ou duas frases.\n- Para cada jogo de ontem, uma frase de comentário com o que decidiu o jogo.\n- Traduza TODOS os motivos de lesão da lista para um português curto e natural.\n- Para cada jogo de hoje, escolha até 2 desfalques que mais pesam (titulares e estrelas),\n  usando exatamente os nomes da lista; se nenhum pesa, não escolha nenhum.`;\n\nconst ESQUEMA = {\n  type: \"object\",\n  properties: {\n    assunto: { type: \"string\", description: \"Assunto do e-mail, até 70 caracteres, sobre o fato mais marcante\" },\n    abertura: { type: \"string\", description: \"Duas ou três frases abrindo a edição\" },\n    jogos: { type: \"array\", items: { type: \"object\", properties: { id: { type: \"string\" }, comentario: { type: \"string\" } }, required: [\"id\", \"comentario\"] } },\n    noticias: {\n      type: \"array\",\n      items: { type: \"object\", properties: { id: { type: \"integer\" }, titulo: { type: \"string\" }, resumo: { type: \"string\" } }, required: [\"id\", \"titulo\", \"resumo\"] },\n    },\n    motivos: { type: \"array\", items: { type: \"object\", properties: { original: { type: \"string\" }, traducao: { type: \"string\" } }, required: [\"original\", \"traducao\"] } },\n    desfalques_importantes: { type: \"array\", items: { type: \"string\" }, description: \"Nomes, exatamente como na lista\" },\n  },\n  required: [\"assunto\", \"abertura\", \"jogos\", \"noticias\", \"motivos\", \"desfalques_importantes\"],\n};\n\nfunction montarPedido({ resultados, agenda, noticias, desfalques }) {\n  const placar = (j) => `${j.visitante.apelido} ${j.visitante.pontos} x ${j.casa.pontos} ${j.casa.apelido}`;\n  const timesDeHoje = new Set(agenda.jogos.flatMap((j) => [j.casa.sigla, j.visitante.sigla]));\n  const relevantes = Object.entries(desfalques.porTime ?? {})\n    .filter(([sigla]) => timesDeHoje.has(sigla))\n    .flatMap(([, lista]) => lista.filter((d) => d.status === \"fora\" || d.status === \"dúvida\"));\n  const dados = {\n    jogos_de_ontem: resultados.jogos.map((j) => ({\n      id: j.id,\n      placar: placar(j),\n      prorrogacoes: j.prorrogacoes,\n      manchete_em_ingles: j.manchete,\n      destaques: [j.visitante, j.casa].map((t) => ({ time: t.apelido, cestinha: t.cestinha, rebotes: t.rebotes, assistencias: t.assistencias })),\n    })),\n    noticias: noticias.noticias.map((n) => ({ id: n.id, fonte: n.fonte, titulo: n.titulo, resumo: n.resumo })),\n    jogos_de_hoje: agenda.jogos.map((j) => ({\n      jogo: `${j.hora} ${j.visitante.apelido} x ${j.casa.apelido}`,\n      desfalques: [j.visitante.sigla, j.casa.sigla].flatMap((sigla) =>\n        (desfalques.porTime?.[sigla] ?? []).filter((d) => d.status === \"fora\" || d.status === \"dúvida\").map((d) => d.jogador),\n      ),\n    })),\n    motivos_de_lesao: [...new Set(relevantes.map((d) => d.motivo))],\n  };\n  return {\n    systemInstruction: { parts: [{ text: SISTEMA }] },\n    contents: [{ role: \"user\", parts: [{ text: JSON.stringify(dados) }] }],\n    generationConfig: { temperature: 0.6, responseMimeType: \"application/json\", responseSchema: ESQUEMA },\n  };\n}\n\nif (typeof $input !== \"undefined\") {\n  const pegar = (tipo) => $input.all().map((i) => i.json).find((j) => j.tipo === tipo) ?? { jogos: [], noticias: [], porTime: {} };\n  const partes = { resultados: pegar(\"resultados\"), agenda: pegar(\"agenda\"), noticias: pegar(\"noticias\"), desfalques: pegar(\"desfalques\") };\n  return [{ json: { ...partes, requisicao: montarPedido(partes) } }];\n} else {\n  module.exports = { montarPedido, ESQUEMA };\n}\n"
+        "jsCode": "// Builds the request for the model. It writes the prose; it never decides facts:\n// scores, links and injuries come from the sources, and the model refers to\n// games and stories only by the ids it was given.\nconst SISTEMA = `Você escreve o Sexto Homem, newsletter diária da NBA em português do Brasil,\nlida às 8h por quem dormiu antes dos jogos acabarem.\nTom: fã que entende de basquete, direto, com bom humor leve. Nada de clichê de IA,\nnada de emoji, nada de exclamação em toda frase.\nRegras:\n- Use somente os dados fornecidos. Não invente placares, números, lesões nem fatos.\n- Refira-se a jogos e notícias apenas pelos \"id\" recebidos.\n- Escolha no máximo 6 notícias, as mais relevantes, sem repetir assunto; ignore as que\n  não forem sobre a NBA. Reescreva o título em português e resuma em uma ou duas frases.\n- Para cada jogo de ontem, um comentário de duas ou três frases: o que decidiu o jogo e,\n  quando o resumo em inglês ou os lances mostrarem, quem se machucou durante a partida\n  (ex.: saiu no primeiro quarto com dor abdominal e não voltou) e o lance mais marcante\n  (uma enterrada por cima de alguém, uma cesta no estouro do relógio). Nada além do que\n  está no resumo e nos lances.\n- Para cada jogo de ontem, escolha no máximo um lance (\"n\") que valha o vídeo: uma\n  jogada espetacular ou a lesão de um jogador importante. Escreva uma legenda curta em\n  português (até 60 caracteres). Se nenhum lance se destaca, não escolha.\n- Para cada jogo de hoje há um palpite pronto (favorito e chance, de uma fonte). Não mude\n  o favorito nem a chance: escreva só o motivo, uma frase, usando o contexto (campanha,\n  campanha em casa ou fora, últimos 5 jogos, segunda noite seguida, desfalques).\n- Traduza TODOS os motivos de lesão da lista para um português curto e natural.\n- Para cada jogo de hoje, escolha até 2 desfalques que mais pesam (titulares e estrelas),\n  usando exatamente os nomes da lista; se nenhum pesa, não escolha nenhum.`;\n\nconst ESQUEMA = {\n  type: \"object\",\n  properties: {\n    assunto: { type: \"string\", description: \"Assunto do e-mail, até 70 caracteres, sobre o fato mais marcante\" },\n    abertura: { type: \"string\", description: \"Duas ou três frases abrindo a edição\" },\n    jogos: {\n      type: \"array\",\n      items: {\n        type: \"object\",\n        properties: {\n          id: { type: \"string\" },\n          comentario: { type: \"string\" },\n          lance: { type: \"integer\", description: \"n do lance escolhido; omita se nenhum\" },\n          legenda_lance: { type: \"string\" },\n        },\n        required: [\"id\", \"comentario\"],\n      },\n    },\n    palpites: {\n      type: \"array\",\n      items: { type: \"object\", properties: { id: { type: \"string\" }, motivo: { type: \"string\" } }, required: [\"id\", \"motivo\"] },\n    },\n    noticias: {\n      type: \"array\",\n      items: { type: \"object\", properties: { id: { type: \"integer\" }, titulo: { type: \"string\" }, resumo: { type: \"string\" } }, required: [\"id\", \"titulo\", \"resumo\"] },\n    },\n    motivos: { type: \"array\", items: { type: \"object\", properties: { original: { type: \"string\" }, traducao: { type: \"string\" } }, required: [\"original\", \"traducao\"] } },\n    desfalques_importantes: { type: \"array\", items: { type: \"string\" }, description: \"Nomes, exatamente como na lista\" },\n  },\n  required: [\"assunto\", \"abertura\", \"jogos\", \"palpites\", \"noticias\", \"motivos\", \"desfalques_importantes\"],\n};\n\nfunction montarPedido({ resultados, agenda, noticias, desfalques }) {\n  const placar = (j) => `${j.visitante.apelido} ${j.visitante.pontos} x ${j.casa.pontos} ${j.casa.apelido}`;\n  const timesDeHoje = new Set(agenda.jogos.flatMap((j) => [j.casa.sigla, j.visitante.sigla]));\n  const relevantes = Object.entries(desfalques.porTime ?? {})\n    .filter(([sigla]) => timesDeHoje.has(sigla))\n    .flatMap(([, lista]) => lista.filter((d) => d.status === \"fora\" || d.status === \"dúvida\"));\n  const dados = {\n    jogos_de_ontem: resultados.jogos.map((j) => ({\n      id: j.id,\n      placar: placar(j),\n      prorrogacoes: j.prorrogacoes,\n      manchete_em_ingles: j.manchete,\n      resumo_em_ingles: j.recap ?? null,\n      lances: (j.lances ?? []).map((l) => ({ n: l.n, titulo: l.titulo })),\n      destaques: [j.visitante, j.casa].map((t) => ({ time: t.apelido, cestinha: t.cestinha, rebotes: t.rebotes, assistencias: t.assistencias })),\n    })),\n    noticias: noticias.noticias.map((n) => ({ id: n.id, fonte: n.fonte, titulo: n.titulo, resumo: n.resumo })),\n    jogos_de_hoje: agenda.jogos.map((j) => ({\n      id: j.id,\n      jogo: `${j.hora} ${j.visitante.apelido} x ${j.casa.apelido}`,\n      palpite: j.palpite ? { favorito: j.palpite.favorito, chance: `${j.palpite.chance}%`, contexto: j.palpite.contexto } : null,\n      desfalques: [j.visitante.sigla, j.casa.sigla].flatMap((sigla) =>\n        (desfalques.porTime?.[sigla] ?? []).filter((d) => d.status === \"fora\" || d.status === \"dúvida\").map((d) => d.jogador),\n      ),\n    })),\n    motivos_de_lesao: [...new Set(relevantes.map((d) => d.motivo))],\n  };\n  return {\n    systemInstruction: { parts: [{ text: SISTEMA }] },\n    contents: [{ role: \"user\", parts: [{ text: JSON.stringify(dados) }] }],\n    generationConfig: { temperature: 0.6, responseMimeType: \"application/json\", responseSchema: ESQUEMA },\n  };\n}\n\nif (typeof $input !== \"undefined\") {\n  const pegar = (tipo) => $input.all().map((i) => i.json).find((j) => j.tipo === tipo) ?? { jogos: [], noticias: [], porTime: {} };\n  const partes = { resultados: pegar(\"resultados\"), agenda: pegar(\"agenda\"), noticias: pegar(\"noticias\"), desfalques: pegar(\"desfalques\") };\n  return [{ json: { ...partes, requisicao: montarPedido(partes) } }];\n} else {\n  module.exports = { montarPedido, ESQUEMA };\n}\n"
       }
     },
     {
-      "id": "no022",
+      "id": "no024",
       "name": "Escrever com a IA",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -403,7 +431,7 @@
       "onError": "continueRegularOutput"
     },
     {
-      "id": "no023",
+      "id": "no025",
       "name": "Montar edição",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -412,11 +440,11 @@
         400
       ],
       "parameters": {
-        "jsCode": "// Turns the sources plus the model's prose into the e-mail. Links and scores\n// always come from the sources; any id the model invents is dropped, and if the\n// model failed altogether the edition still goes out, just without commentary.\n\nconst esc = (s) => String(s ?? \"\").replace(/[&<>\"']/g, (c) => ({ \"&\": \"&amp;\", \"<\": \"&lt;\", \">\": \"&gt;\", '\"': \"&quot;\", \"'\": \"&#39;\" })[c]);\nconst NOME_FONTE = { espn_br: \"ESPN Brasil\", lance: \"Lance!\", espn: \"ESPN\" };\n// Hardwood palette, same as the site: cream, dark brown, amber wood.\nconst COR = { tinta: \"#1e1610\", apagado: \"#7a6a5a\", linha: \"#e3d6c5\", laranja: \"#94591c\", fundo: \"#f4ece1\", cartao: \"#fbf7f1\" };\n\nfunction lerIA(resposta) {\n  try {\n    const texto = resposta?.candidates?.[0]?.content?.parts?.[0]?.text;\n    return texto ? JSON.parse(texto) : null;\n  } catch {\n    return null;\n  }\n}\n\nfunction dataPorExtenso(iso) {\n  return new Intl.DateTimeFormat(\"pt-BR\", { weekday: \"long\", day: \"numeric\", month: \"long\", timeZone: \"UTC\" }).format(new Date(`${iso}T12:00:00Z`));\n}\n\nfunction secao(titulo, corpo) {\n  return `<h2 style=\"font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:${COR.apagado};margin:36px 0 12px;border-top:1px solid ${COR.linha};padding-top:20px\">${titulo}</h2>${corpo}`;\n}\n\nfunction montarEdicao({ dataEdicao, resultados, agenda, noticias, desfalques }, ia) {\n  const idsJogos = new Set(resultados.jogos.map((j) => j.id));\n  const porId = new Map(noticias.noticias.map((n) => [n.id, n]));\n  const comentarios = new Map((ia?.jogos ?? []).filter((j) => idsJogos.has(j.id)).map((j) => [j.id, j.comentario]));\n  const escolhidas = (ia?.noticias ?? []).filter((n) => porId.has(n.id)).slice(0, 6);\n  // Without the model: the newest stories in Portuguese, titles as published.\n  const lista = escolhidas.length\n    ? escolhidas.map((n) => ({ ...porId.get(n.id), titulo: n.titulo, resumo: n.resumo }))\n    : noticias.noticias.filter((n) => n.fonte !== \"espn\").slice(0, 6).map((n) => ({ ...n, resumo: \"\" }));\n  const traducao = new Map((ia?.motivos ?? []).map((m) => [m.original, m.traducao]));\n  // Only names that are really in the report: anything else the model wrote is ignored.\n  const importantes = new Set(ia?.desfalques_importantes ?? []);\n\n  if (!resultados.jogos.length && !lista.length) return null; // nothing happened: no edition\n\n  const jogosHtml = resultados.jogos\n    .map((j) => {\n      const time = (t) => `<span style=\"font-weight:${t.venceu ? 700 : 400};color:${t.venceu ? COR.tinta : COR.apagado}\">${esc(t.apelido)} ${t.pontos}</span>`;\n      const ot = j.prorrogacoes ? ` <span style=\"color:${COR.apagado};font-size:13px\">(${j.prorrogacoes > 1 ? `${j.prorrogacoes} prorrogações` : \"prorrogação\"})</span>` : \"\";\n      const cestinhas = [j.visitante, j.casa]\n        .filter((t) => t.cestinha)\n        .map((t) => `${esc(t.cestinha.nome)} ${t.cestinha.valor} pts`)\n        .join(\" · \");\n      const comentario = comentarios.get(j.id);\n      return `<div style=\"margin:0 0 18px\">\n  <p style=\"margin:0;font-size:18px\">${time(j.visitante)} <span style=\"color:${COR.apagado}\">x</span> ${time(j.casa)}${ot}</p>\n  <p style=\"margin:4px 0 0;font-size:13px;color:${COR.apagado}\">Cestinhas: ${cestinhas}</p>\n  ${comentario ? `<p style=\"margin:6px 0 0;font-size:15px;line-height:1.55\">${esc(comentario)}</p>` : \"\"}\n</div>`;\n    })\n    .join(\"\");\n\n  const noticiasHtml = lista\n    .map(\n      (n) => `<div style=\"margin:0 0 18px\">\n  <a href=\"${esc(n.url)}\" style=\"font-size:16px;font-weight:700;color:${COR.tinta};text-decoration:none\">${esc(n.titulo)}</a>\n  ${n.resumo ? `<p style=\"margin:4px 0 0;font-size:15px;line-height:1.55\">${esc(n.resumo)}</p>` : \"\"}\n  <p style=\"margin:4px 0 0;font-size:12px;color:${COR.apagado}\">${esc(NOME_FONTE[n.fonte] ?? n.fonte)} · <a href=\"${esc(n.url)}\" style=\"color:${COR.laranja}\">ler</a></p>\n</div>`,\n    )\n    .join(\"\");\n\n  const fora = (sigla) =>\n    (desfalques.porTime?.[sigla] ?? [])\n      .filter((d) => d.status === \"fora\" || d.status === \"dúvida\")\n      .map((d) => ({ nome: d.jogador, texto: `${esc(d.jogador)}${d.status === \"dúvida\" ? \" (dúvida)\" : \"\"}, ${esc(traducao.get(d.motivo) ?? d.motivo)}` }));\n  // A long list of season-long injuries is noise: show the (at most) two absences\n  // that matter, as picked by the model from the report, and count the rest.\n  const agendaHtml = agenda.jogos\n    .map((j) => {\n      const todas = [...fora(j.visitante.sigla), ...fora(j.casa.sigla)];\n      const escolhidas = ia ? todas.filter((b) => importantes.has(b.nome)) : todas.slice(0, 2);\n      const resto = todas.length - escolhidas.length;\n      const linha = [escolhidas.map((b) => b.texto).join(\"; \"), resto ? `${escolhidas.length ? \"e mais \" : \"\"}${resto} fora` : \"\"]\n        .filter(Boolean)\n        .join(\"; \");\n      return `<div style=\"margin:0 0 14px\">\n  <p style=\"margin:0;font-size:16px\"><span style=\"font-family:monospace;color:${COR.laranja}\">${esc(j.hora)}</span>&nbsp; ${esc(j.visitante.apelido)} x ${esc(j.casa.apelido)}</p>\n  ${linha ? `<p style=\"margin:3px 0 0;font-size:13px;color:${COR.apagado}\">Desfalques: ${linha}</p>` : \"\"}\n</div>`;\n    })\n    .join(\"\");\n\n  const avisos = [resultados.falha, agenda.falha, desfalques.falha].filter(Boolean);\n  const assunto = (ia?.assunto ?? `O que rolou na NBA: ${dataPorExtenso(dataEdicao)}`).slice(0, 90);\n  const html = `<div style=\"background:${COR.fundo};padding:24px 0\"><div style=\"font-family:Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;padding:32px 28px;background:${COR.cartao};color:${COR.tinta}\">\n<p style=\"margin:0;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:${COR.laranja};font-weight:700\">Sexto Homem</p>\n<p style=\"margin:4px 0 0;font-size:13px;color:${COR.apagado}\">${esc(dataPorExtenso(dataEdicao))}</p>\n<p style=\"margin:22px 0 0;font-size:17px;line-height:1.6\">Bom dia, {{NOME}}. ${esc(ia?.abertura ?? \"Aqui está o que rolou na NBA enquanto você dormia.\")}</p>\n{{DESTAQUE_TIME}}\n${resultados.jogos.length ? secao(\"Resultados da noite\", jogosHtml) : \"\"}\n${lista.length ? secao(\"O que rolou\", noticiasHtml) : \"\"}\n${agenda.jogos.length ? secao(\"Hoje à noite\", agendaHtml) : \"\"}\n${avisos.length ? `<p style=\"margin:24px 0 0;font-size:12px;color:${COR.apagado}\">Hoje faltou: ${esc(avisos.join(\", \"))}.</p>` : \"\"}\n<p style=\"margin:36px 0 0;font-size:12px;line-height:1.6;color:${COR.apagado};border-top:1px solid ${COR.linha};padding-top:16px\">Você recebe o Sexto Homem porque se inscreveu e confirmou seu e-mail. Placares e estatísticas: ESPN. Desfalques: relatório oficial da NBA. <a href=\"{{DESCADASTRAR}}\" style=\"color:${COR.apagado}\">Descadastrar em um clique</a>.</p>\n</div></div>`;\n\n  return { dataEdicao, assunto, html, jogos: resultados.jogos.length, noticiasIds: lista.map((n) => n.id).filter(Number.isInteger), comIA: Boolean(ia), resultados, agenda };\n}\n\nif (typeof $input !== \"undefined\") {\n  const base = $(\"Preparar pedido à IA\").first().json;\n  const edicao = montarEdicao({ ...base, dataEdicao: $(\"Datas\").first().json.dataEdicao }, lerIA($input.first().json));\n  return edicao ? [{ json: edicao }] : [];\n} else {\n  module.exports = { montarEdicao, lerIA };\n}\n"
+        "jsCode": "// Turns the sources plus the model's prose into the e-mail. Links and scores\n// always come from the sources; any id the model invents is dropped, and if the\n// model failed altogether the edition still goes out, just without commentary.\n\nconst esc = (s) => String(s ?? \"\").replace(/[&<>\"']/g, (c) => ({ \"&\": \"&amp;\", \"<\": \"&lt;\", \">\": \"&gt;\", '\"': \"&quot;\", \"'\": \"&#39;\" })[c]);\nconst NOME_FONTE = { espn_br: \"ESPN Brasil\", lance: \"Lance!\", espn: \"ESPN\" };\n// Hardwood palette, same as the site: cream, dark brown, amber wood.\nconst COR = { tinta: \"#1e1610\", apagado: \"#7a6a5a\", linha: \"#e3d6c5\", laranja: \"#94591c\", fundo: \"#f4ece1\", cartao: \"#fbf7f1\" };\n\nfunction lerIA(resposta) {\n  try {\n    const texto = resposta?.candidates?.[0]?.content?.parts?.[0]?.text;\n    return texto ? JSON.parse(texto) : null;\n  } catch {\n    return null;\n  }\n}\n\nfunction dataPorExtenso(iso) {\n  return new Intl.DateTimeFormat(\"pt-BR\", { weekday: \"long\", day: \"numeric\", month: \"long\", timeZone: \"UTC\" }).format(new Date(`${iso}T12:00:00Z`));\n}\n\nfunction secao(titulo, corpo) {\n  return `<h2 style=\"font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:${COR.apagado};margin:36px 0 12px;border-top:1px solid ${COR.linha};padding-top:20px\">${titulo}</h2>${corpo}`;\n}\n\nfunction montarEdicao({ dataEdicao, resultados, agenda, noticias, desfalques }, ia) {\n  const idsJogos = new Set(resultados.jogos.map((j) => j.id));\n  const porId = new Map(noticias.noticias.map((n) => [n.id, n]));\n  const daIA = new Map((ia?.jogos ?? []).filter((j) => idsJogos.has(j.id)).map((j) => [j.id, j]));\n  const motivos = new Map((ia?.palpites ?? []).map((p) => [p.id, p.motivo]));\n  const escolhidas = (ia?.noticias ?? []).filter((n) => porId.has(n.id)).slice(0, 6);\n  // Without the model: the newest stories in Portuguese, titles as published.\n  const lista = escolhidas.length\n    ? escolhidas.map((n) => ({ ...porId.get(n.id), titulo: n.titulo, resumo: n.resumo }))\n    : noticias.noticias.filter((n) => n.fonte !== \"espn\").slice(0, 6).map((n) => ({ ...n, resumo: \"\" }));\n  const traducao = new Map((ia?.motivos ?? []).map((m) => [m.original, m.traducao]));\n  // Only names that are really in the report: anything else the model wrote is ignored.\n  const importantes = new Set(ia?.desfalques_importantes ?? []);\n\n  if (!resultados.jogos.length && !lista.length) return null; // nothing happened: no edition\n\n  const jogosHtml = resultados.jogos\n    .map((j) => {\n      const time = (t) => `<span style=\"font-weight:${t.venceu ? 700 : 400};color:${t.venceu ? COR.tinta : COR.apagado}\">${esc(t.apelido)} ${t.pontos}</span>`;\n      const ot = j.prorrogacoes ? ` <span style=\"color:${COR.apagado};font-size:13px\">(${j.prorrogacoes > 1 ? `${j.prorrogacoes} prorrogações` : \"prorrogação\"})</span>` : \"\";\n      const cestinhas = [j.visitante, j.casa]\n        .filter((t) => t.cestinha)\n        .map((t) => `${esc(t.cestinha.nome)} ${t.cestinha.valor} pts`)\n        .join(\" · \");\n      const comentario = daIA.get(j.id)?.comentario;\n      // The link always comes from ESPN's list: a clip number the model made up shows nothing.\n      const escolhido = (j.lances ?? []).find((l) => l.n === daIA.get(j.id)?.lance && l.url);\n      const lance = escolhido\n        ? `<p style=\"margin:6px 0 0;font-size:13px\"><a href=\"${esc(escolhido.url)}\" style=\"color:${COR.laranja};text-decoration:none\">&#9654;&nbsp;${esc(daIA.get(j.id)?.legenda_lance || \"Ver o lance\")}</a></p>`\n        : \"\";\n      return `<div style=\"margin:0 0 18px\">\n  <p style=\"margin:0;font-size:18px\">${time(j.visitante)} <span style=\"color:${COR.apagado}\">x</span> ${time(j.casa)}${ot}</p>\n  <p style=\"margin:4px 0 0;font-size:13px;color:${COR.apagado}\">Cestinhas: ${cestinhas}</p>\n  ${comentario ? `<p style=\"margin:6px 0 0;font-size:15px;line-height:1.55\">${esc(comentario)}</p>` : \"\"}\n  ${lance}\n</div>`;\n    })\n    .join(\"\");\n\n  const noticiasHtml = lista\n    .map(\n      (n) => `<div style=\"margin:0 0 18px\">\n  <a href=\"${esc(n.url)}\" style=\"font-size:16px;font-weight:700;color:${COR.tinta};text-decoration:none\">${esc(n.titulo)}</a>\n  ${n.resumo ? `<p style=\"margin:4px 0 0;font-size:15px;line-height:1.55\">${esc(n.resumo)}</p>` : \"\"}\n  <p style=\"margin:4px 0 0;font-size:12px;color:${COR.apagado}\">${esc(NOME_FONTE[n.fonte] ?? n.fonte)} · <a href=\"${esc(n.url)}\" style=\"color:${COR.laranja}\">ler</a></p>\n</div>`,\n    )\n    .join(\"\");\n\n  const fora = (sigla) =>\n    (desfalques.porTime?.[sigla] ?? [])\n      .filter((d) => d.status === \"fora\" || d.status === \"dúvida\")\n      .map((d) => ({ nome: d.jogador, texto: `${esc(d.jogador)}${d.status === \"dúvida\" ? \" (dúvida)\" : \"\"}, ${esc(traducao.get(d.motivo) ?? d.motivo)}` }));\n  // A long list of season-long injuries is noise: show the (at most) two absences\n  // that matter, as picked by the model from the report, and count the rest.\n  const agendaHtml = agenda.jogos\n    .map((j) => {\n      const todas = [...fora(j.visitante.sigla), ...fora(j.casa.sigla)];\n      const escolhidas = ia ? todas.filter((b) => importantes.has(b.nome)) : todas.slice(0, 2);\n      const resto = todas.length - escolhidas.length;\n      const linha = [escolhidas.map((b) => b.texto).join(\"; \"), resto ? `${escolhidas.length ? \"e mais \" : \"\"}${resto} fora` : \"\"]\n        .filter(Boolean)\n        .join(\"; \");\n      const p = j.palpite;\n      const favorito = p && (p.favorito === j.casa.sigla ? j.casa : p.favorito === j.visitante.sigla ? j.visitante : null);\n      const motivo = motivos.get(j.id);\n      const palpite = favorito\n        ? `<p style=\"margin:5px 0 0;font-size:14px;line-height:1.5\"><span style=\"color:${COR.apagado}\">Palpite:</span> <strong>${esc(favorito.apelido)}</strong> <span style=\"color:${COR.apagado}\">(${p.chance}%)</span>${motivo ? ` &mdash; ${esc(motivo)}` : \"\"}</p>`\n        : \"\";\n      return `<div style=\"margin:0 0 16px\">\n  <p style=\"margin:0;font-size:16px\"><span style=\"font-family:monospace;color:${COR.laranja}\">${esc(j.hora)}</span>&nbsp; ${esc(j.visitante.apelido)} x ${esc(j.casa.apelido)}</p>\n  ${palpite}\n  ${linha ? `<p style=\"margin:3px 0 0;font-size:13px;color:${COR.apagado}\">Desfalques: ${linha}</p>` : \"\"}\n</div>`;\n    })\n    .join(\"\");\n\n  const avisos = [resultados.falha, agenda.falha, desfalques.falha].filter(Boolean);\n  const assunto = (ia?.assunto ?? `O que rolou na NBA: ${dataPorExtenso(dataEdicao)}`).slice(0, 90);\n  const html = `<div style=\"background:${COR.fundo};padding:24px 0\"><div style=\"font-family:Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;padding:32px 28px;background:${COR.cartao};color:${COR.tinta}\">\n<p style=\"margin:0;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:${COR.laranja};font-weight:700\">Sexto Homem</p>\n<p style=\"margin:4px 0 0;font-size:13px;color:${COR.apagado}\">${esc(dataPorExtenso(dataEdicao))}</p>\n<p style=\"margin:22px 0 0;font-size:17px;line-height:1.6\">Bom dia, {{NOME}}. ${esc(ia?.abertura ?? \"Aqui está o que rolou na NBA enquanto você dormia.\")}</p>\n{{DESTAQUE_TIME}}\n${resultados.jogos.length ? secao(\"Resultados da noite\", jogosHtml) : \"\"}\n${lista.length ? secao(\"O que rolou\", noticiasHtml) : \"\"}\n${agenda.jogos.length ? secao(\"Hoje à noite: jogos e palpites\", agendaHtml) : agenda.falha ? \"\" : secao(\"Hoje à noite\", `<p style=\"margin:0;font-size:15px;color:${COR.apagado}\">Sem jogos da NBA hoje à noite.</p>`)}\n${avisos.length ? `<p style=\"margin:24px 0 0;font-size:12px;color:${COR.apagado}\">Hoje faltou: ${esc(avisos.join(\", \"))}.</p>` : \"\"}\n<p style=\"margin:36px 0 0;font-size:12px;line-height:1.6;color:${COR.apagado};border-top:1px solid ${COR.linha};padding-top:16px\">Você recebe o Sexto Homem porque se inscreveu e confirmou seu e-mail. Placares, estatísticas, lances e chances dos palpites: ESPN. Desfalques: relatório oficial da NBA. Palpite é palpite: não é dica de aposta. <a href=\"{{DESCADASTRAR}}\" style=\"color:${COR.apagado}\">Descadastrar em um clique</a>.</p>\n</div></div>`;\n\n  return { dataEdicao, assunto, html, jogos: resultados.jogos.length, noticiasIds: lista.map((n) => n.id).filter(Number.isInteger), comIA: Boolean(ia), resultados, agenda };\n}\n\nif (typeof $input !== \"undefined\") {\n  const base = $(\"Preparar pedido à IA\").first().json;\n  const edicao = montarEdicao({ ...base, dataEdicao: $(\"Datas\").first().json.dataEdicao }, lerIA($input.first().json));\n  return edicao ? [{ json: edicao }] : [];\n} else {\n  module.exports = { montarEdicao, lerIA };\n}\n"
       }
     },
     {
-      "id": "no024",
+      "id": "no026",
       "name": "Registrar edição",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
@@ -439,7 +467,7 @@
       }
     },
     {
-      "id": "no025",
+      "id": "no027",
       "name": "Inscritos que faltam",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
@@ -462,7 +490,7 @@
       }
     },
     {
-      "id": "no026",
+      "id": "no028",
       "name": "Em lotes de 10",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
@@ -476,7 +504,7 @@
       }
     },
     {
-      "id": "no027",
+      "id": "no029",
       "name": "Personalizar",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -489,7 +517,7 @@
       }
     },
     {
-      "id": "no028",
+      "id": "no030",
       "name": "Enviar e-mail",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
@@ -515,7 +543,7 @@
       }
     },
     {
-      "id": "no029",
+      "id": "no031",
       "name": "Registrar envio",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
@@ -538,7 +566,7 @@
       }
     },
     {
-      "id": "no030",
+      "id": "no032",
       "name": "Fechar edição",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
@@ -757,6 +785,17 @@
       "main": [
         [
           {
+            "node": "Resumos dos jogos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resumos dos jogos": {
+      "main": [
+        [
+          {
             "node": "Juntar tudo",
             "type": "main",
             "index": 0
@@ -765,6 +804,17 @@
       ]
     },
     "Agenda": {
+      "main": [
+        [
+          {
+            "node": "Palpites",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Palpites": {
       "main": [
         [
           {

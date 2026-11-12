@@ -29,13 +29,15 @@ function montarEdicao({ dataEdicao, resultados, agenda, noticias, desfalques }, 
   const idsJogos = new Set(resultados.jogos.map((j) => j.id));
   const porId = new Map(noticias.noticias.map((n) => [n.id, n]));
   const daIA = new Map((ia?.jogos ?? []).filter((j) => idsJogos.has(j.id)).map((j) => [j.id, j]));
-  // At most three clips in the whole edition, a link under every game is clutter.
-  const comVideo = new Set(
-    resultados.jogos
-      .filter((j) => (j.lances ?? []).some((l) => l.n === daIA.get(j.id)?.lance && l.url))
-      .slice(0, MAX_VIDEOS)
-      .map((j) => j.id),
-  );
+  // At most three clips in the whole edition, in the model's order of importance: a link
+  // under every game is clutter. The link always comes from ESPN's list for that game,
+  // so a game or clip number the model made up shows nothing.
+  const porJogo = new Map(resultados.jogos.map((j) => [j.id, j]));
+  const videos = new Map();
+  for (const v of ia?.videos ?? []) {
+    const lance = (porJogo.get(v.id)?.lances ?? []).find((l) => l.n === v.n && l.url);
+    if (lance && !videos.has(v.id) && videos.size < MAX_VIDEOS) videos.set(v.id, { url: lance.url, legenda: v.legenda });
+  }
   const motivos = new Map((ia?.palpites ?? []).map((p) => [p.id, p.motivo]));
   const escolhidas = (ia?.noticias ?? []).filter((n) => porId.has(n.id)).slice(0, 6);
   // Without the model: the newest stories in Portuguese, titles as published.
@@ -57,10 +59,9 @@ function montarEdicao({ dataEdicao, resultados, agenda, noticias, desfalques }, 
         .map((t) => `${esc(t.cestinha.nome)} ${t.cestinha.valor} pts`)
         .join(" · ");
       const comentario = daIA.get(j.id)?.comentario;
-      // The link always comes from ESPN's list: a clip number the model made up shows nothing.
-      const escolhido = comVideo.has(j.id) && (j.lances ?? []).find((l) => l.n === daIA.get(j.id)?.lance && l.url);
-      const lance = escolhido
-        ? `<p style="margin:6px 0 0;font-size:13px"><a href="${esc(escolhido.url)}" style="color:${COR.laranja};text-decoration:none">&#9654;&nbsp;${esc(daIA.get(j.id)?.legenda_lance || "Ver o lance")}</a></p>`
+      const video = videos.get(j.id);
+      const lance = video
+        ? `<p style="margin:6px 0 0;font-size:13px"><a href="${esc(video.url)}" style="color:${COR.laranja};text-decoration:none">&#9654;&nbsp;${esc(video.legenda || "Ver o lance")}</a></p>`
         : "";
       return `<div style="margin:0 0 18px">
   <p style="margin:0;font-size:18px">${time(j.visitante)} <span style="color:${COR.apagado}">x</span> ${time(j.casa)}${ot}</p>

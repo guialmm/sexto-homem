@@ -15,11 +15,11 @@ Regras:
   (ex.: saiu no primeiro quarto com dor abdominal e não voltou) e o lance mais marcante
   (uma enterrada por cima de alguém, uma cesta no estouro do relógio). Nada além do que
   está no resumo e nos lances.
-- Vídeos: escolha no máximo 3 lances na edição inteira (campo "lance" com o "n"), e só
-  os que valem o clique: uma jogada realmente espetacular (enterrada por cima de alguém,
-  cesta da vitória no fim) ou a lesão de uma estrela. Enterrada comum, bola de três comum
-  ou arremesso errado não contam. Na dúvida, não escolha. Legenda curta em português
-  (até 60 caracteres).
+- Vídeos: em "videos", liste no máximo 3 lances da noite inteira, do mais importante para
+  o menos importante, cada um com o "id" do jogo e o "n" do lance. Primeiro a lesão de uma
+  estrela, depois jogadas realmente espetaculares (enterrada por cima de alguém, cesta da
+  vitória no fim). Enterrada comum, bola de três comum ou arremesso errado não contam. Na
+  dúvida, não escolha. Legenda curta em português (até 60 caracteres).
 - Para cada jogo de hoje há um palpite pronto (favorito e chance, de uma fonte). Não mude
   o favorito nem a chance: escreva só o motivo, uma frase, usando o contexto (campanha,
   campanha em casa ou fora, últimos 5 jogos, segunda noite seguida, desfalques).
@@ -39,10 +39,17 @@ const ESQUEMA = {
         properties: {
           id: { type: "string" },
           comentario: { type: "string" },
-          lance: { type: "integer", description: "n do lance escolhido; omita se nenhum" },
-          legenda_lance: { type: "string" },
         },
         required: ["id", "comentario"],
+      },
+    },
+    videos: {
+      type: "array",
+      description: "No máximo 3, do mais importante para o menos importante",
+      items: {
+        type: "object",
+        properties: { id: { type: "string" }, n: { type: "integer" }, legenda: { type: "string" } },
+        required: ["id", "n", "legenda"],
       },
     },
     palpites: {
@@ -56,7 +63,7 @@ const ESQUEMA = {
     motivos: { type: "array", items: { type: "object", properties: { original: { type: "string" }, traducao: { type: "string" } }, required: ["original", "traducao"] } },
     desfalques_importantes: { type: "array", items: { type: "string" }, description: "Nomes, exatamente como na lista" },
   },
-  required: ["assunto", "abertura", "jogos", "palpites", "noticias", "motivos", "desfalques_importantes"],
+  required: ["assunto", "abertura", "jogos", "videos", "palpites", "noticias", "motivos", "desfalques_importantes"],
 };
 
 function montarPedido({ resultados, agenda, noticias, desfalques }) {

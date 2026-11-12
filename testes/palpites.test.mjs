@@ -82,7 +82,8 @@ const edicao = (agendaJogos, iaExtra = {}) =>
     {
       assunto: "a",
       abertura: "b",
-      jogos: [{ id: "1", comentario: "Curry saiu no primeiro quarto.", lance: 1, legenda_lance: "Curry deixa a quadra" }],
+      jogos: [{ id: "1", comentario: "Curry saiu no primeiro quarto." }],
+      videos: [{ id: "1", n: 1, legenda: "Curry deixa a quadra" }],
       palpites: [{ id: "77", motivo: "Toronto vem da segunda noite seguida." }, { id: "999", motivo: "inventado" }],
       noticias: [],
       motivos: [],
@@ -100,25 +101,35 @@ test("o e-mail traz o link do lance escolhido e o palpite com o motivo", () => {
 });
 
 test("lance inventado ou sem link não vira link; sem jogos hoje, o e-mail avisa", () => {
-  const { html } = edicao([], { jogos: [{ id: "1", comentario: "x", lance: 2 }] });
+  const { html } = edicao([], { videos: [{ id: "1", n: 2, legenda: "sem link" }] });
   assert.ok(!html.includes("&#9654;"));
   assert.ok(html.includes("Sem jogos da NBA hoje à noite."));
-  const outro = edicao([], { jogos: [{ id: "1", comentario: "x", lance: 42 }] });
-  assert.ok(!outro.html.includes("&#9654;"));
+  for (const v of [{ id: "1", n: 42, legenda: "x" }, { id: "999", n: 1, legenda: "x" }]) {
+    assert.ok(!edicao([], { videos: [v] }).html.includes("&#9654;"));
+  }
 });
 
-test("no máximo 3 vídeos na edição inteira, mesmo que a IA escolha mais", () => {
-  const lances = [{ n: 1, titulo: "t", url: "https://www.espn.com/video/clip/_/id/9" }];
+test("no máximo 3 vídeos, na ordem de importância da IA e não na ordem dos jogos", () => {
   const jogos = Array.from({ length: 5 }, (_, i) => ({
     id: String(i + 1),
     visitante: { sigla: "A", apelido: "A", pontos: 1, venceu: false },
     casa: { sigla: "B", apelido: "B", pontos: 2, venceu: true },
     prorrogacoes: 0,
-    lances,
+    lances: [{ n: 1, titulo: "t", url: `https://www.espn.com/video/clip/_/id/${i + 1}` }],
   }));
   const { html } = montarEdicao(
     { dataEdicao: "2026-11-12", resultados: { jogos }, agenda: { jogos: [] }, noticias: { noticias: [] }, desfalques: { porTime: {} } },
-    { jogos: jogos.map((j) => ({ id: j.id, comentario: "c", lance: 1 })), palpites: [], noticias: [], motivos: [], desfalques_importantes: [] },
+    {
+      jogos: [],
+      // The injury of the last game first: it must survive the cut.
+      videos: ["5", "2", "4", "1", "3"].map((id) => ({ id, n: 1, legenda: `video ${id}` })),
+      palpites: [],
+      noticias: [],
+      motivos: [],
+      desfalques_importantes: [],
+    },
   );
   assert.equal(html.split("&#9654;").length - 1, 3);
+  assert.ok(["5", "2", "4"].every((id) => html.includes(`video ${id}`)));
+  assert.ok(!html.includes("video 1") && !html.includes("video 3"));
 });

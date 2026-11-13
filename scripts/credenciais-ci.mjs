@@ -30,9 +30,9 @@ const credenciais = [
     name: "SMTP · Sexto Homem",
     type: "smtp",
     data: {
-      host: process.env.SMTP_HOST ?? "smtp-relay.brevo.com",
+      host: process.env.SMTP_HOST ?? "smtp.gmail.com",
       port: 587,
-      secure: false, // 587 starts in plain text and upgrades with STARTTLS
+      secure: false, // 587 starts in plain text and upgrades with STARTTLS (Gmail and Brevo alike)
       disableStartTls: false,
       user: process.env.SMTP_LOGIN,
       password: process.env.SMTP_CHAVE,

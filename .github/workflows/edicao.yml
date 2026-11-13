@@ -1,6 +1,6 @@
 # The daily edition, with no server: every morning GitHub Actions starts a throwaway
 # n8n (SQLite inside the container), imports the workflow and runs it once. The
-# newsletter's data lives in Neon and the e-mails go out through Brevo.
+# newsletter's data lives in Neon and the e-mails go out through Gmail SMTP.
 # A failed run is GitHub e-mailing the repository owner: that is the alert.
 name: edicao
 
@@ -37,8 +37,12 @@ jobs:
         with:
           node-version: 22
 
-      - name: credenciais do n8n (Neon e Brevo)
+      - name: credenciais do n8n (Neon e Gmail)
         env:
+          # Gmail SMTP with an app password: the e-mail leaves Google signed as gmail.com, which
+          # Gmail's sender rules accept. Brevo can't sign for a gmail.com sender and its
+          # messages started being held on 2026-11-12.
+          SMTP_HOST: smtp.gmail.com
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SMTP_LOGIN: ${{ secrets.SMTP_LOGIN }}
           SMTP_CHAVE: ${{ secrets.SMTP_CHAVE }}
